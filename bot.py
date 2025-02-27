@@ -272,20 +272,21 @@ class ChessBot:
         # Lookup position in transposition table
         transposition = self.lookup_position(board)
         if transposition and transposition.depth >= remaining_depth:
+            stored_value: float = transposition.value
             if transposition.flag == 'EXACT':
-                return transposition.value, transposition.best_move
+                return stored_value, transposition.best_move
             elif transposition.flag == 'LOWERBOUND':
-                alpha = max(alpha, transposition.value)
+                alpha = max(alpha, stored_value)
             elif transposition.flag == 'UPPERBOUND':
-                beta = min(beta, transposition.value)
+                beta = min(beta, stored_value)
             if beta <= alpha:
-                return transposition.value, transposition.best_move
+                return stored_value, transposition.best_move
 
         best_move = None
         original_alpha = alpha
-        pseduo_sorted_moves = self.get_sorted_moves(board)
 
         if maximizing_player:
+            pseduo_sorted_moves = self.get_sorted_moves(board)
             best_value = float('-inf')
             for move in pseduo_sorted_moves:
                 self.moves_checked += 1
@@ -302,10 +303,11 @@ class ChessBot:
                     best_value = value
                     best_move = move
                 alpha = max(alpha, best_value)
-                if beta <= alpha:
+                if beta <= alpha: # Big performance improvement
                     break # Black's best response is worse than White's guarenteed value
 
         else: # Minimizing player
+            pseduo_sorted_moves = self.get_sorted_moves(board)
             best_value = float('inf')
             for move in pseduo_sorted_moves:
                 self.moves_checked += 1
@@ -322,14 +324,13 @@ class ChessBot:
                     best_value = value
                     best_move = move
                 beta = min(beta, best_value)
-                if beta <= alpha:
+                if beta <= alpha: # Big performance improvement
                     break # White guarenteed value is better than Black's best option
 
         # Store position in transposition table with normalized value
-        store_value = best_value if maximizing_player else -best_value
         if best_value <= original_alpha:
             flag = 'UPPERBOUND'
-        elif best_value >= beta:
+        if best_value >= beta:
             flag = 'LOWERBOUND'
         else:
             flag = 'EXACT'
