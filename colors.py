@@ -19,6 +19,6 @@ def get_move_time_color(move_time):
     """Returns color based on move time."""
     if move_time < 6:
         return GREEN
-    elif move_time < 12:
+    elif move_time < 10:
         return YELLOW
     return RED

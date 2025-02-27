@@ -25,9 +25,9 @@ class ChessBot:
         self.transposition_table = {}  # Dictionary to store positions
 
     # Built-in Zobrist hashing
-    def store_position(self, board: ChessBoard, depth: int, value: float, flag: str, best_move: Optional[chess.Move]):
+    def store_position(self, chess_board: chess.Board, depth: int, value: float, flag: str, best_move: Optional[chess.Move]):
         """Store a position in the transposition table using chess.polyglot Zobrist hashing."""
-        key = chess.polyglot.zobrist_hash(board.get_board_state())  # Use built-in hashing
+        key = chess.polyglot.zobrist_hash(chess_board)  # Use built-in hashing
         existing = self.transposition_table.get(key)
         
         if not existing or existing.depth <= depth:
@@ -38,19 +38,18 @@ class ChessBot:
                 best_move=best_move,
             )
 
-    def lookup_position(self, board: ChessBoard) -> Optional[TranspositionEntry]:
+    def lookup_position(self, chess_board: chess.Board) -> Optional[TranspositionEntry]:
         """Lookup a position in the transposition table using chess.polyglot Zobrist hashing."""
-        key = chess.polyglot.zobrist_hash(board.get_board_state())
+        key = chess.polyglot.zobrist_hash(chess_board) # Use built-in hashing
         return self.transposition_table.get(key)
 
 
-    def evaluate_position(self, board: ChessBoard):
+    def evaluate_position(self, chess_board: chess.Board, checkmate = False):
         """
         Evaluate the current position.
         Positive values favor white, negative values favor black.
         """
-        chess_board = board.get_board_state()
-        if chess_board.is_checkmate():
+        if checkmate or chess_board.is_checkmate():
             return -10_000 if chess_board.turn else 10_000    
 
         # elif chess_board.is_stalemate():
@@ -61,10 +60,8 @@ class ChessBot:
         #     return 0
         # elif chess_board.is_fivefold_repetition():
         #     return 0
-
-        score = 0
         
-        score += self.evaluate_material(chess_board) # Material and piece position evaluation
+        score = self.evaluate_material(chess_board) # Material and piece position evaluation
         
         # score += self.evaluate_piece_position(chess_board)
 
@@ -173,7 +170,7 @@ class ChessBot:
         """
         return ((mg_score * phase) + (eg_score * (256 - phase))) // 256
 
-    def get_sorted_moves(self, board: ChessBoard) -> list:
+    def get_sorted_moves(self, chess_board: chess.Board) -> list:
         """
         Score all legal moves in the current position using the following data:
             - Checkmate
@@ -187,9 +184,8 @@ class ChessBot:
         Returns a list of moves sorted by importance.
         TODO Turn into generator
         """
-        chess_board = board.get_board_state()
         good_moves, bad_moves, other_moves = [], [], []
-        for move in board.get_legal_moves():
+        for move in chess_board.legal_moves:
             score = 0
                 
             # if chess_board.is_checkmate(): # In checkmate
@@ -313,14 +309,17 @@ class ChessBot:
         Minimax algorithm with alpha-beta pruning.
         Returns (best_value, best_move) tuple.
         """
-        if remaining_depth <= 0 or board.get_board_state().is_checkmate() or board.get_board_state().is_stalemate(): # Simple game over check
-            return self.evaluate_position(board), None
+        chess_board = board.get_board_state()
+        if remaining_depth <= 0: # or board.is_stalemate(): # Simple game over check
+            return self.evaluate_position(chess_board), None
+        elif chess_board.is_checkmate():
+            return self.evaluate_position(chess_board, checkmate=True), None
 
         # if remaining_depth <= 0: # Implement quiescence search
         #     return self.quiescence_search(board, alpha, beta), None
 
         # Lookup position in transposition table
-        transposition = self.lookup_position(board)
+        transposition = self.lookup_position(chess_board)
         if transposition and transposition.depth >= remaining_depth:
             stored_value: float = transposition.value
             if transposition.flag == 'EXACT':
@@ -336,10 +335,9 @@ class ChessBot:
         original_alpha = alpha
 
         if maximizing_player:
-            # pseduo_sorted_moves = self.get_sorted_moves(board)
             best_value = float('-inf')
-            for move in self.get_sorted_moves(board):
-            # for move in self.sorted_move_generator(board.get_board_state()):
+            for move in self.get_sorted_moves(chess_board):
+            # for move in self.sorted_move_generator(chess_board):
                 self.moves_checked += 1
                 if CHECKING_MOVE_ARROW and remaining_depth == DEPTH: # Display the root move
                     self.game.checking_move = move
@@ -358,10 +356,9 @@ class ChessBot:
                     break # Black's best response is worse than White's guarenteed value
 
         else: # Minimizing player
-            # pseduo_sorted_moves = self.get_sorted_moves(board)
             best_value = float('inf')
-            for move in self.get_sorted_moves(board):
-            # for move in self.sorted_move_generator(board.get_board_state()):
+            for move in self.get_sorted_moves(chess_board):
+            # for move in self.sorted_move_generator(chess_board):
                 self.moves_checked += 1
                 if CHECKING_MOVE_ARROW and remaining_depth == DEPTH: # Display the root move
                     self.game.checking_move = move
@@ -387,7 +384,7 @@ class ChessBot:
         else:
             flag = 'EXACT'
         
-        self.store_position(board, remaining_depth, best_value, flag, best_move)
+        self.store_position(chess_board, remaining_depth, best_value, flag, best_move)
 
         return best_value, best_move
 

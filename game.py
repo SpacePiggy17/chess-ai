@@ -118,7 +118,7 @@ class ChessGame:
                 print(f"Illegal move attempted: {move}")
                 break
                 
-            print(f"Eval: {self.black_player.evaluate_position(self.board)}")
+            print(f"Eval: {self.black_player.evaluate_position(self.board.get_board_state())}")
             # print(f"Move played: {move}")
             print("-------------------")
             self.last_move = move            
