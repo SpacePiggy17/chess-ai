@@ -128,7 +128,8 @@ class ChessGame:
         print(f"Number of turns: {self.board.get_board_state().fullmove_number}") # Print number of turns
         result = self.board.get_result()
         print(f"Game Over! Result: {result}")
-        print(f"Checkmate checks saved: {self.white_player.checkmate_checks_saved} + {self.black_player.checkmate_checks_saved}")
+        checkmates_saved = 0 if type(self.white_player) is HumanPlayer else self.white_player.checkmate_checks_saved
+        print(f"Checkmate checks saved: {checkmates_saved} + {self.black_player.checkmate_checks_saved}")
         
         # Keep window open until closed
         while True:

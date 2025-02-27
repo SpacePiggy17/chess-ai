@@ -32,6 +32,7 @@ class ChessBot:
         key = chess.polyglot.zobrist_hash(chess_board)  # Use built-in hashing
         existing = self.transposition_table.get(key)
         
+        # Store if not existing or existing depth is less than or equal to the current depth
         if not existing or existing.depth <= depth:
             self.transposition_table[key] = TranspositionEntry(
                 depth=depth,
