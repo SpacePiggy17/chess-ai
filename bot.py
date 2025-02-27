@@ -1,13 +1,13 @@
 from board import ChessBoard
+import chess.polyglot # Built-in Zobrist hashing
 import time
-import heapq
+import heapq # For priority queue
 
 from constants import PIECE_VALUES, CENTER_SQUARES, DEPTH, CHECKING_MOVE_ARROW
-import colors
+import colors # Print logging colors
 
 from dataclasses import dataclass
 from typing import Optional
-import chess.polyglot
 
 import sys
 
@@ -23,46 +23,6 @@ class ChessBot:
         self.moves_checked = 0
         self.game = game # Reference to the game object
         self.transposition_table = {}  # Dictionary to store positions
-
-    # # Fen as key
-    # def store_position(self, board: ChessBoard, depth: int, value: float, flag: str, best_move: Optional[chess.Move]):
-    #     """Store a position in the transposition table using the fen as the key."""
-    #     key = board.get_board_state().fen()
-    #     existing = self.transposition_table.get(key)
-        
-    #     # Replace if new position is searched deeper
-    #     if not existing or existing.depth <= depth:
-    #         self.transposition_table[key] = TranspositionEntry(
-    #             depth=depth,
-    #             value=value,
-    #             flag=flag,
-    #             best_move=best_move
-    #         )
-
-    # def lookup_position(self, board: ChessBoard) -> Optional[TranspositionEntry]:
-    #     """Lookup a position in the transposition table using the fen as the key."""
-    #     key = board.get_board_state().fen()
-    #     return self.transposition_table.get(key)
-
-    # # Zobrist hashing
-    # def lookup_position(self, board: ChessBoard) -> Optional[TranspositionEntry]:
-    #     """Lookup a position in the transposition table using Zobrist hashing."""
-    #     key = calculate_hash(board.get_board_state())
-    #     return self.transposition_table.get(key)
-
-    # def store_position(self, board: ChessBoard, depth: int, value: float, flag: str, best_move: Optional[chess.Move]):
-    #     """Store a position in the transposition table using Zobrist hashing."""
-    #     key = calculate_hash(board.get_board_state())
-    #     existing = self.transposition_table.get(key)
-        
-    #     # Replace if new position is searched deeper
-    #     if not existing or existing.depth <= depth:
-    #         self.transposition_table[key] = TranspositionEntry(
-    #             depth=depth,
-    #             value=value,
-    #             flag=flag,
-    #             best_move=best_move
-    #         )
 
     # Built-in Zobrist hashing
     def store_position(self, board: ChessBoard, depth: int, value: float, flag: str, best_move: Optional[chess.Move]):
@@ -82,6 +42,7 @@ class ChessBot:
         """Lookup a position in the transposition table using chess.polyglot Zobrist hashing."""
         key = chess.polyglot.zobrist_hash(board.get_board_state())
         return self.transposition_table.get(key)
+
 
     def evaluate_position(self, board: ChessBoard):
         """
@@ -197,6 +158,7 @@ class ChessBot:
         bad_moves = [item[2] for item in bad_moves]
         return good_moves + other_moves + bad_moves
 
+
     def minimax_alpha_beta(self, board: ChessBoard, remaining_depth: int, alpha: int, beta: int, maximizing_player: bool):
         """
         Minimax algorithm with alpha-beta pruning.
@@ -274,6 +236,7 @@ class ChessBot:
         self.store_position(board, remaining_depth, best_value, flag, best_move)
 
         return best_value, best_move
+
 
     def get_move(self, board):
         """
