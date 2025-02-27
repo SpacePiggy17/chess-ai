@@ -24,6 +24,8 @@ class ChessBot:
         self.game = game # Reference to the game object
         self.transposition_table = {}  # Dictionary to store positions
 
+        self.checkmate_checks_saved = 0
+
     # Built-in Zobrist hashing
     def store_position(self, chess_board: chess.Board, depth: int, value: float, flag: str, best_move: Optional[chess.Move]):
         """Store a position in the transposition table using chess.polyglot Zobrist hashing."""
@@ -49,17 +51,18 @@ class ChessBot:
         Evaluate the current position.
         Positive values favor white, negative values favor black.
         """
-        if checkmate or chess_board.is_checkmate():
+        if checkmate or chess_board.is_checkmate(): # 4.59s
             return -10_000 if chess_board.turn else 10_000    
 
-        # elif chess_board.is_stalemate():
+        # Avoid draws
+        # elif chess_board.is_stalemate(): # VERY SLOW (+12.9s)
         #     return 0
-        # elif chess_board.is_insufficient_material():
-        #     return 0
-        # elif chess_board.is_seventyfive_moves():
-        #     return 0
-        # elif chess_board.is_fivefold_repetition():
-        #     return 0
+        elif chess_board.is_insufficient_material(): # 1.64s
+            return -1_000
+        elif chess_board.is_seventyfive_moves(): # 0.455s
+            return -1_000
+        elif chess_board.is_fivefold_repetition(): # 1.54s
+            return -1_000
         
         score = self.evaluate_material(chess_board) # Material and piece position evaluation
         
@@ -184,8 +187,8 @@ class ChessBot:
         Returns a list of moves sorted by importance.
         TODO Turn into generator
         """
-        good_moves, bad_moves, other_moves = [], [], []
-        for move in chess_board.legal_moves:
+        moves_heap = []
+        for i, move in enumerate(chess_board.legal_moves):
             score = 0
                 
             # if chess_board.is_checkmate(): # In checkmate
@@ -198,7 +201,8 @@ class ChessBot:
             # if chess_board.is_check(): # Is in check
             #     score -= 10_000
 
-            if chess_board.is_capture(move): # Capturing a piece
+            # Capturing a piece bonus
+            if chess_board.is_capture(move):
                 victim = chess_board.piece_at(move.to_square)
                 attacker = chess_board.piece_at(move.from_square)
 
@@ -209,12 +213,14 @@ class ChessBot:
 
                 if victim and attacker:
                     # Prioritize capturing higher value pieces using lower value pieces
-                    score += 10_000 + PIECE_VALUES[victim.piece_type] - PIECE_VALUES[attacker.piece_type]/100
+                    score += 10_000 + PIECE_VALUES[victim.piece_type] - PIECE_VALUES[attacker.piece_type]//100
 
-            if move.promotion: # Move results in promotion
+            # Promotion bonus
+            if move.promotion:
                 score += 9_000
 
-            if move.to_square in CENTER_SQUARES: # Center control
+            # Center control bonus
+            if move.to_square in CENTER_SQUARES:
                 score += 100
 
             # if score == 0: # Move is not positive or negative
@@ -250,16 +256,9 @@ class ChessBot:
 
             # board.undo_move()
                 
-            if score > 0:
-                heapq.heappush(good_moves, (-score, id(move), move))  # Negative score for max-heap
-            elif score < 0:
-                heapq.heappush(bad_moves, (-score, id(move), move))  # Negative score for max-heap
-            else:
-                other_moves.append(move)
+            heapq.heappush(moves_heap, (-score, i, move))
 
-        good_moves = [item[2] for item in good_moves]
-        bad_moves = [item[2] for item in bad_moves]
-        return good_moves + other_moves + bad_moves
+        return [entry[2] for entry in moves_heap]
 
     def sorted_move_generator(self, chess_board: chess.Board):
         """
@@ -313,6 +312,7 @@ class ChessBot:
         if remaining_depth <= 0: # or board.is_stalemate(): # Simple game over check
             return self.evaluate_position(chess_board), None
         elif chess_board.is_checkmate():
+            self.checkmate_checks_saved += 1
             return self.evaluate_position(chess_board, checkmate=True), None
 
         # if remaining_depth <= 0: # Implement quiescence search
