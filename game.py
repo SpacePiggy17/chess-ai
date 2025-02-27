@@ -60,7 +60,7 @@ class ChessGame:
             }
 
         arrows = []
-        if (LAST_MOVE_ARROW and last_move and force_update): # Last move arrow
+        if (LAST_MOVE_ARROW and last_move): # Last move arrow
             # Create arrow for the last move
             arrows.append(chess.svg.Arrow(
                 last_move.from_square,
@@ -94,7 +94,7 @@ class ChessGame:
         print("-------------------")
         
         while not self.board.is_game_over():
-            print(f"Player: {'White' if self.board.get_board_state().turn else 'Black'}")
+            print(f"Player: {'White' if self.board.get_board_state().turn else 'Black'} - {self.board.get_board_state().fullmove_number}")
 
             # Get current player for selected square highlighting
             current_player = self.white_player if self.board.get_board_state().turn else self.black_player
@@ -119,7 +119,7 @@ class ChessGame:
                 break
                 
             print(f"Eval: {self.black_player.evaluate_position(self.board)}")
-            print(f"Move played: {move}")
+            # print(f"Move played: {move}")
             print("-------------------")
             self.last_move = move            
             

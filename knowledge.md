@@ -45,4 +45,3 @@ A chess game implementation with human vs bot play using Python, pygame, and pyt
 - Keep UI code modular and separated from game logic
 - Handle all pygame events explicitly
 - Clean up resources properly on exit
-
