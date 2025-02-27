@@ -49,21 +49,123 @@ class ChessBot:
         Evaluate the current position.
         Positive values favor white, negative values favor black.
         """
-        chess_board = board.get_board_state()
-
         if board.is_game_over():
-            if chess_board.is_checkmate():
-                return -10_000 if chess_board.turn else 10_000
+            if board.get_board_state().is_checkmate():
+                return -10_000 if board.get_board_state().turn else 10_000
             return 0  # Draw
 
         score = 0
 
-        # Count material
-        for piece in PIECE_VALUES:
-            score += len(chess_board.pieces(piece, True)) * PIECE_VALUES[piece]
-            score -= len(chess_board.pieces(piece, False)) * PIECE_VALUES[piece]
-           
+        chess_board = board.get_board_state()
+        
+        score += self.evaluate_material(chess_board) # Material and piece position evaluation
+        
+        # score += self.evaluate_piece_position(chess_board)
+
+        # score += self.evaluate_pawn_structure(chess_board) # Pawn structure # WARNING REALLY SLOW
+        # score += self.evaluate_king_safety(chess_board) # King safety # ~2s slower
+
+        # score += self.evaluate_mobility(chess_board) # Mobility
+       
         return score
+
+    def evaluate_material(self, board: ChessBoard):
+        """
+        Basic piece counting with standard values.
+        Additional bonuses for piece combinations.
+        Can be extended with phase-dependent values.
+        """
+        score = 0
+    
+        # Basic material count
+        for piece in PIECE_VALUES:
+            score += len(board.pieces(piece, True)) * PIECE_VALUES[piece]
+            score -= len(board.pieces(piece, False)) * PIECE_VALUES[piece]
+    
+        # Bishop pair bonus
+        if len(board.pieces(chess.BISHOP, True)) >= 2:
+            score += 50
+        if len(board.pieces(chess.BISHOP, False)) >= 2:
+            score -= 50
+        
+        return score
+
+    def evaluate_pawn_structure(self, board: ChessBoard):
+        """
+        Checks for common pawn weaknesses.
+        Evaluates pawn chains and islands.
+        Identifies passed pawns and their value.
+        """
+        score = 0
+    
+        # Evaluate for both colors
+        for color in [True, False]:
+            multiplier = 1 if color else -1
+            pawns = board.pieces(chess.PAWN, color)
+        
+            # Check each file for isolated pawns
+            for file in range(8):
+                pawns_in_file = sum(1 for pawn in pawns
+                                if chess.square_file(pawn) == file)
+                if pawns_in_file > 0:
+                    # Check adjacent files
+                    adjacent_pawns = sum(1 for pawn in pawns
+                        if chess.square_file(pawn) in [file-1, file+1])
+                    if adjacent_pawns == 0:
+                        score -= 20 * multiplier  # Isolated pawn penalty
+                    
+                if pawns_in_file > 1:
+                    score -= 10 * multiplier  # Doubled pawn penalty
+                
+        return score
+
+    def evaluate_king_safety(self, board: ChessBoard):
+        """
+        Analyze pawn shield and open files in near king.
+        Can be extended with attack pattern recognition.
+        """
+        score = 0
+    
+        # Evaluate pawn shield for both kings
+        for color in [True, False]:
+            multiplier = 1 if color else -1
+            king_square = board.king(color)
+            if king_square is None:
+                continue
+            
+            king_file = chess.square_file(king_square)
+            king_rank = chess.square_rank(king_square)
+        
+            # Check pawn shield
+            shield_score = 0
+            for file in range(max(0, king_file - 1), min(8, king_file + 2)):
+                shield_rank = king_rank + (1 if color else -1)
+                shield_square = chess.square(file, shield_rank)
+                if board.piece_at(shield_square) == chess.Piece(chess.PAWN, color):
+                    shield_score += 10
+                
+            score += shield_score * multiplier
+        
+        return score
+
+    def get_game_phase(board: ChessBoard):
+        """
+        Returns a value between 0 (endgame) and 256 (opening)
+        based on remaining material
+        """
+        npm = 0  # Non-pawn material
+        for piece_type in [chess.KNIGHT, chess.BISHOP, chess.ROOK, chess.QUEEN]:
+            npm += len(board.pieces(piece_type, True)) * PIECE_VALUES[piece_type]
+            npm += len(board.pieces(piece_type, False)) * PIECE_VALUES[piece_type]
+    
+        return min(npm, 256)
+
+    def interpolate(mg_score, eg_score, phase):
+        """
+        Interpolate between middlegame and endgame scores
+        based on game phase
+        """
+        return ((mg_score * phase) + (eg_score * (256 - phase))) // 256
 
     def get_sorted_moves(self, board: ChessBoard) -> list:
         """
@@ -170,15 +272,14 @@ class ChessBot:
         # Lookup position in transposition table
         transposition = self.lookup_position(board)
         if transposition and transposition.depth >= remaining_depth:
-            stored_value = transposition.value if maximizing_player else -transposition.value
             if transposition.flag == 'EXACT':
-                return stored_value, transposition.best_move
+                return transposition.value, transposition.best_move
             elif transposition.flag == 'LOWERBOUND':
-                alpha = max(alpha, stored_value)
+                alpha = max(alpha, transposition.value)
             elif transposition.flag == 'UPPERBOUND':
-                beta = min(beta, stored_value)
+                beta = min(beta, transposition.value)
             if beta <= alpha:
-                return stored_value, transposition.best_move
+                return transposition.value, transposition.best_move
 
         best_move = None
         original_alpha = alpha
@@ -257,9 +358,11 @@ class ChessBot:
         time_per_move = time_taken / self.moves_checked if self.moves_checked > 0 else 0
         print(f"Moves/Time: {colors.BOLD}{colors.get_moves_color(self.moves_checked)}{self.moves_checked:,}{colors.RESET} / "
             f"{colors.BOLD}{colors.get_move_time_color(time_taken)}{time_taken:.2f}{colors.RESET} s = "
-            f"{colors.BOLD}{colors.CYAN}{time_taken/self.moves_checked * 1000:.4f}{colors.RESET} ms/M")
+            f"{colors.BOLD}{colors.CYAN}{time_per_move * 1000:.4f}{colors.RESET} ms/M")
         # Size of transposition table
         print(f"Transposition table: {colors.BOLD}{colors.MAGENTA}{len(self.transposition_table):,}{colors.RESET} entries, "
             f"{colors.BOLD}{colors.CYAN}{sys.getsizeof(self.transposition_table)/ (1024 * 1024):.4f}{colors.RESET} MB")
 
         return best_move
+
+# How to improve speed and efficiency more?
