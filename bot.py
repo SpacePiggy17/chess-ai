@@ -1,6 +1,7 @@
 from board import ChessBoard
 import chess.polyglot # Built-in Zobrist hashing
-import time
+# import time
+import timeit
 import heapq # For priority queue
 
 from constants import PIECE_VALUES, CENTER_SQUARES, DEPTH, CHECKING_MOVE_ARROW
@@ -29,7 +30,7 @@ class ChessBot:
     # Built-in Zobrist hashing
     def store_position(self, chess_board: chess.Board, depth: int, value: float, flag: str, best_move: Optional[chess.Move]):
         """Store a position in the transposition table using chess.polyglot Zobrist hashing."""
-        key = chess.polyglot.zobrist_hash(chess_board)  # Use built-in hashing
+        key = chess.polyglot.zobrist_hash(chess_board)  # ! SLOW
         existing = self.transposition_table.get(key)
         
         # Store if not existing or existing depth is less than or equal to the current depth
@@ -42,8 +43,11 @@ class ChessBot:
             )
 
     def lookup_position(self, chess_board: chess.Board) -> Optional[TranspositionEntry]:
-        """Lookup a position in the transposition table using chess.polyglot Zobrist hashing."""
-        key = chess.polyglot.zobrist_hash(chess_board) # Use built-in hashing
+        """
+        Lookup a position in the transposition table using chess.polyglot Zobrist hashing.
+        Returns the entry if found, otherwise None.
+        """
+        key = chess.polyglot.zobrist_hash(chess_board) # ! SLOW
         return self.transposition_table.get(key)
 
 
@@ -52,17 +56,17 @@ class ChessBot:
         Evaluate the current position.
         Positive values favor white, negative values favor black.
         """
-        if checkmate or chess_board.is_checkmate(): # 4.59s
-            return -10_000 if chess_board.turn else 10_000    
+        if checkmate or chess_board.is_checkmate(): # ? 2.43s
+            return -10_000 if chess_board.turn else 10_000
 
         # Avoid draws
-        # elif chess_board.is_stalemate(): # VERY SLOW (+12.9s)
+        # elif chess_board.is_stalemate(): # ! VERY SLOW
         #     return 0
-        elif chess_board.is_insufficient_material(): # 1.64s
+        elif chess_board.is_insufficient_material():
             return -1_000
-        elif chess_board.is_seventyfive_moves(): # 0.455s
+        elif chess_board.is_seventyfive_moves():
             return -1_000
-        elif chess_board.is_fivefold_repetition(): # 1.54s
+        elif chess_board.is_fivefold_repetition():
             return -1_000
         
         score = self.evaluate_material(chess_board) # Material and piece position evaluation
@@ -85,7 +89,7 @@ class ChessBot:
         score = 0
     
         # Basic material count
-        for piece in PIECE_VALUES:
+        for piece in PIECE_VALUES: # ! REDUCE TIME
             score += len(chess_board.pieces(piece, True)) * PIECE_VALUES[piece]
             score -= len(chess_board.pieces(piece, False)) * PIECE_VALUES[piece]
     
@@ -189,7 +193,7 @@ class ChessBot:
         TODO Turn into generator
         """
         moves_heap = []
-        for i, move in enumerate(chess_board.legal_moves):
+        for i, move in enumerate(chess_board.legal_moves): # ! REDUCE TIME
             score = 0
                 
             # if chess_board.is_checkmate(): # In checkmate
@@ -393,14 +397,23 @@ class ChessBot:
     def get_move(self, board):
         """
         Main method to select the best move.
-        """
+        """        
         self.moves_checked = 0
-        start_time = time.time()
+        # start_time = time.time()
 
-        best_value, best_move = self.minimax_alpha_beta(board, DEPTH, float('-inf'), float('inf'), board.get_board_state().turn)
+        # best_value, best_move = self.minimax_alpha_beta(board, DEPTH, float('-inf'), float('inf'), board.get_board_state().turn)
 
-        end_time = time.time()
-        time_taken = end_time - start_time
+        # end_time = time.time()
+        # time_taken = end_time - start_time
+
+        # Define the code to time
+        def timed_minimax():
+            return self.minimax_alpha_beta(board, DEPTH, float('-inf'), float('inf'), board.get_board_state().turn)
+
+        # Run minimax with timing
+        number = 1  # Number of executions
+        time_taken = timeit.timeit(timed_minimax, number=number) / number
+        best_value, best_move = timed_minimax()  # Run once more to get the actual result
 
         # Moves checked over time taken
         time_per_move = time_taken / self.moves_checked if self.moves_checked > 0 else 0
