@@ -56,7 +56,7 @@ class ChessBot:
         Evaluate the current position.
         Positive values favor white, negative values favor black.
         """
-        if checkmate or chess_board.is_checkmate(): # ? 2.43s
+        if checkmate or chess_board.is_checkmate(): # ! SLOW
             return -10_000 if chess_board.turn else 10_000
 
         # Avoid draws
@@ -66,7 +66,7 @@ class ChessBot:
             return -1_000
         elif chess_board.is_seventyfive_moves():
             return -1_000
-        elif chess_board.is_fivefold_repetition():
+        elif chess_board.is_fivefold_repetition(): # ! SLOW in late game
             return -1_000
         
         score = self.evaluate_material(chess_board) # Material and piece position evaluation
