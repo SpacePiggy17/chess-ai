@@ -24,51 +24,66 @@ class ChessBot:
         self.moves_checked = 0
         self.game = game # Reference to the game object
         self.transposition_table = {}  # Dictionary to store positions
-
-        self.checkmate_checks_saved = 0
+        self.position_history = {} # Dictionary to store position history
 
     # Built-in Zobrist hashing
-    def store_position(self, chess_board: chess.Board, depth: int, value: float, flag: str, best_move: Optional[chess.Move]):
+    def store_position(self, chess_board: chess.Board, depth: int, value: float, flag: str, best_move: Optional[chess.Move], key: int = None):
         """Store a position in the transposition table using chess.polyglot Zobrist hashing."""
-        key = chess.polyglot.zobrist_hash(chess_board)  # ! SLOW
-        existing = self.transposition_table.get(key)
+        existing = self.lookup_position(chess_board, key)
         
-        # Store if not existing or existing depth is less than or equal to the current depth
-        if not existing or existing.depth <= depth:
+        # Store if not existing
+        if not existing:
             self.transposition_table[key] = TranspositionEntry(
                 depth=depth,
                 value=value,
                 flag=flag,
                 best_move=best_move,
             )
+        elif existing.depth <= depth: # Replace if new depth is greater
+            self.transposition_table[key].depth = depth
+            self.transposition_table[key].value = value
+            self.transposition_table[key].flag = flag
+            self.transposition_table[key].best_move = best_move
 
-    def lookup_position(self, chess_board: chess.Board) -> Optional[TranspositionEntry]:
+    def lookup_position(self, chess_board: chess.Board, key: Optional[int] = None) -> Optional[TranspositionEntry]:
         """
         Lookup a position in the transposition table using chess.polyglot Zobrist hashing.
         Returns the entry if found, otherwise None.
         """
-        key = chess.polyglot.zobrist_hash(chess_board) # ! SLOW
         return self.transposition_table.get(key)
 
+    def update_position_history(self, key: int):
+        """Update position history with the current position and the number of times it has occurred."""
+        self.position_history[key] = self.position_history.get(key, 0) + 1
 
-    def evaluate_position(self, chess_board: chess.Board, checkmate = False):
+    def check_for_threefold_repetition(self, key: int):
+        """
+        Check for threefold repetition in the position history.
+        If there is 3 or more of the same position (the key counts as a repetition), return True.
+        """
+        return self.position_history.get(key, 0) >= 2 # Check for threefold repetition
+
+    def evaluate_position(self, chess_board: chess.Board, key: Optional[int] = None, has_legal_moves = False) -> float:
         """
         Evaluate the current position.
         Positive values favor white, negative values favor black.
         """
-        if checkmate or chess_board.is_checkmate(): # ! SLOW
-            return -10_000 if chess_board.turn else 10_000
+        # Check expensive operations once
+        if not has_legal_moves:
+            has_legal_moves = bool(chess_board.legal_moves) # ! SLOW
+        is_check = chess_board.is_check()
 
-        # Avoid draws
-        # elif chess_board.is_stalemate(): # ! VERY SLOW
-        #     return 0
-        elif chess_board.is_insufficient_material():
-            return -1_000
-        elif chess_board.is_seventyfive_moves():
-            return -1_000
-        elif chess_board.is_fivefold_repetition(): # ! SLOW in late game
-            return -1_000
+        # Avoid game over state if not a win
+        if not has_legal_moves: # No legal moves
+            if is_check: # Checkmate
+                return -10_000 if chess_board.turn else 10_000
+            return 1_000 if chess_board.turn else -1_000 # Stalemate
+        elif chess_board.is_insufficient_material(): # Insufficient material for either side to win
+            return -1_000 if chess_board.turn else 1_000
+        elif chess_board.can_claim_fifty_moves(): # Avoid fifty move rule
+            return -1_000 if chess_board.turn else 1_000
         
+        # Evaluate the position
         score = self.evaluate_material(chess_board) # Material and piece position evaluation
         
         # score += self.evaluate_piece_position(chess_board)
@@ -314,27 +329,33 @@ class ChessBot:
         Returns (best_value, best_move) tuple.
         """
         chess_board = board.get_board_state()
-        if remaining_depth <= 0: # or board.is_stalemate(): # Simple game over check
-            return self.evaluate_position(chess_board), None
-        elif chess_board.is_checkmate():
-            self.checkmate_checks_saved += 1
-            return self.evaluate_position(chess_board, checkmate=True), None
+        key = chess.polyglot.zobrist_hash(chess_board) # Calculate once and reuse through code
+        
+        if remaining_depth <= 0: # Leaf node
+            return self.evaluate_position(chess_board, key), None
+        elif not chess_board.legal_moves: # No legal moves
+            return self.evaluate_position(chess_board, key, has_legal_moves=False), None
 
-        # if remaining_depth <= 0: # Implement quiescence search
-        #     return self.quiescence_search(board, alpha, beta), None
+        # if remaining_depth <= 0: # TODO Implement quiescence search
+            # return self.quiescence_search(board, alpha, beta), None
 
-        # Lookup position in transposition table
-        transposition = self.lookup_position(chess_board)
-        if transposition and transposition.depth >= remaining_depth:
-            stored_value: float = transposition.value
-            if transposition.flag == 'EXACT':
-                return stored_value, transposition.best_move
-            elif transposition.flag == 'LOWERBOUND':
-                alpha = max(alpha, stored_value)
-            elif transposition.flag == 'UPPERBOUND':
-                beta = min(beta, stored_value)
-            if beta <= alpha:
-                return stored_value, transposition.best_move
+        # Check for threefold repetition
+        if self.check_for_threefold_repetition(key):
+            if remaining_depth != DEPTH: # If not root depth, return draw
+                return -1_000 if chess_board.turn else 1_000, None
+        else:
+            # Lookup position in transposition table (skip if threefold repetition and continue evaluation)
+            transposition = self.lookup_position(chess_board, key)
+            if transposition and transposition.depth >= remaining_depth:
+                stored_value: float = transposition.value
+                if transposition.flag == 'EXACT':
+                    return stored_value, transposition.best_move
+                elif transposition.flag == 'LOWERBOUND':
+                    alpha = max(alpha, stored_value)
+                elif transposition.flag == 'UPPERBOUND':
+                    beta = min(beta, stored_value)
+                if beta <= alpha:
+                    return stored_value, transposition.best_move
 
         best_move = None
         original_alpha = alpha
@@ -349,7 +370,7 @@ class ChessBot:
                     self.game.display_board(self.game.last_move)  # Update display
 
                 # Make a move and evaluate the position
-                board.make_move(move)
+                board.make_move(move) # ! VERY SLOW
                 value = self.minimax_alpha_beta(board, remaining_depth - 1, alpha, beta, False)[0]
                 board.undo_move()
 
@@ -370,7 +391,7 @@ class ChessBot:
                     self.game.display_board(self.game.last_move)  # Update display
 
                 # Make a move and evaluate the position
-                board.make_move(move)
+                board.make_move(move) # ! VERY SLOW
                 value = self.minimax_alpha_beta(board, remaining_depth - 1, alpha, beta, True)[0]
                 board.undo_move()
 
@@ -381,7 +402,7 @@ class ChessBot:
                 if beta <= alpha: # Big performance improvement
                     break # White guarenteed value is better than Black's best option
 
-        # Store position in transposition table with normalized value
+        # Store position in transposition table
         if best_value <= original_alpha:
             flag = 'UPPERBOUND'
         if best_value >= beta:
@@ -389,7 +410,8 @@ class ChessBot:
         else:
             flag = 'EXACT'
         
-        self.store_position(chess_board, remaining_depth, best_value, flag, best_move)
+        # Store in transposition table with previously calculated key
+        self.store_position(chess_board, remaining_depth, best_value, flag, best_move, key)
 
         return best_value, best_move
 
@@ -399,12 +421,10 @@ class ChessBot:
         Main method to select the best move.
         """        
         self.moves_checked = 0
-        # start_time = time.time()
 
-        # best_value, best_move = self.minimax_alpha_beta(board, DEPTH, float('-inf'), float('inf'), board.get_board_state().turn)
+        # Update position history with other player's move
+        self.update_position_history(chess.polyglot.zobrist_hash(board.get_board_state())) # Update position history
 
-        # end_time = time.time()
-        # time_taken = end_time - start_time
 
         # Define the code to time
         def timed_minimax():
@@ -415,6 +435,9 @@ class ChessBot:
         time_taken = timeit.timeit(timed_minimax, number=number) / number
         best_value, best_move = timed_minimax()  # Run once more to get the actual result
 
+        # Update position history with the real move made
+        self.update_position_history(chess.polyglot.zobrist_hash(board.get_board_state())) # Update position history
+
         # Moves checked over time taken
         time_per_move = time_taken / self.moves_checked if self.moves_checked > 0 else 0
         print(f"Moves/Time: {colors.BOLD}{colors.get_moves_color(self.moves_checked)}{self.moves_checked:,}{colors.RESET} / "
@@ -423,6 +446,8 @@ class ChessBot:
         # Size of transposition table
         print(f"Transposition table: {colors.BOLD}{colors.MAGENTA}{len(self.transposition_table):,}{colors.RESET} entries, "
             f"{colors.BOLD}{colors.CYAN}{sys.getsizeof(self.transposition_table)/ (1024 * 1024):.4f}{colors.RESET} MB")
+
+        print(f"FEN: {board.get_board_state().fen()}")
 
         return best_move
 

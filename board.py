@@ -1,8 +1,13 @@
 import chess
 
+from constants import STARTING_FEN
+
 class ChessBoard:
     def __init__(self):
-        self.board = chess.Board()
+        if STARTING_FEN:
+            self.board = chess.Board(STARTING_FEN)
+        else:
+            self.board = chess.Board()
     
     def get_legal_moves(self):
         """Returns a list of legal moves in the current position."""

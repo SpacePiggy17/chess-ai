@@ -1,5 +1,8 @@
 import chess
 
+STARTING_FEN = None  # Set to None for standard starting position, or FEN string for custom starting position
+# STARTING_FEN = "6k1/pp6/8/4K1p1/8/n7/r7/7r b - - 9 46"
+
 # Board and piece settings
 PIECE_VALUES = {
     chess.PAWN: 100,
