@@ -1,7 +1,7 @@
 import chess
 import chess.svg
 from board import ChessBoard
-from bot import ChessBot
+from bot2 import ChessBot
 from human import HumanPlayer
 import pygame
 import cairosvg

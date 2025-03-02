@@ -13,7 +13,10 @@ PIECE_VALUES = {
     chess.KING: 20000
 }
 
-CENTER_SQUARES = {chess.D4, chess.D5, chess.E4, chess.E5}
+MAX_VALUE = PIECE_VALUES[chess.KING] + 1
+MIN_VALUE = -MAX_VALUE
+
+CENTER_SQUARES = {chess.D4, chess.D5, chess.E4, chess.E5} # Chess already has this built in
 
 # Game settings
 IS_BOT = True # Set to False for human vs bot, True for bot vs bot
