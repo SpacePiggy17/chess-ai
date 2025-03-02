@@ -44,7 +44,7 @@ class ChessBot:
         # Check expensive operations once
         if not has_legal_moves:
             has_legal_moves = bool(chess_board.legal_moves) # ! SLOW
-        is_check = chess_board.is_check()
+        is_check: bool = chess_board.is_check()
 
         # Evaluate game-ending conditions
         if not has_legal_moves: # No legal moves
@@ -66,43 +66,28 @@ class ChessBot:
         Basic piece counting with standard values.
         Additional bonuses for piece combinations.
         Can be extended with phase-dependent values.
-        """
-        score = 0
-    
+        """    
         # Count all pieces at once with direct bitboard access (much more optimized than provided version)
         wp = chess_board.occupied_co[chess.WHITE]
         bp = chess_board.occupied_co[chess.BLACK]
         
-        # Pawns
-        score += PIECE_VALUES_STOCKFISH[chess.PAWN] * chess.popcount(wp & chess_board.pawns)
-        score -= PIECE_VALUES_STOCKFISH[chess.PAWN] * chess.popcount(bp & chess_board.pawns)
-        
-        # Knights
-        score += PIECE_VALUES_STOCKFISH[chess.KNIGHT] * chess.popcount(wp & chess_board.knights)
-        score -= PIECE_VALUES_STOCKFISH[chess.KNIGHT] * chess.popcount(bp & chess_board.knights)
-        
+        # Pawns, Knights, Rooks, Queens
+        score = (
+            PIECE_VALUES_STOCKFISH[chess.PAWN] * (chess.popcount(wp & chess_board.pawns) - chess.popcount(bp & chess_board.pawns)) + 
+            PIECE_VALUES_STOCKFISH[chess.KNIGHT] * (chess.popcount(wp & chess_board.knights) - chess.popcount(bp & chess_board.knights)) +
+            PIECE_VALUES_STOCKFISH[chess.ROOK] * (chess.popcount(wp & chess_board.rooks) - chess.popcount(bp & chess_board.rooks)) +
+            PIECE_VALUES_STOCKFISH[chess.QUEEN] * (chess.popcount(wp & chess_board.queens) - chess.popcount(bp & chess_board.queens))
+        )
+
         # Bishops
         white_bishop_count = chess.popcount(wp & chess_board.bishops)
         black_bishop_count = chess.popcount( bp & chess_board.bishops)
-        score += PIECE_VALUES_STOCKFISH[chess.BISHOP] * white_bishop_count
-        score -= PIECE_VALUES_STOCKFISH[chess.BISHOP] * black_bishop_count
+        score += PIECE_VALUES_STOCKFISH[chess.BISHOP] * (white_bishop_count - black_bishop_count)
         
-        # Bishop pair bonus
-        if white_bishop_count >= 2:
-            score += 50
-        if black_bishop_count >= 2:
-            score -= 50
+        # Bishop pair bonus worth half a pawn
+        return score + ((white_bishop_count >= 2) - (black_bishop_count >= 2)) * (PIECE_VALUES_STOCKFISH[chess.PAWN] >> 1)
         
-        # Rooks
-        score += PIECE_VALUES_STOCKFISH[chess.ROOK] * chess.popcount(wp & chess_board.rooks)
-        score -= PIECE_VALUES_STOCKFISH[chess.ROOK] * chess.popcount(bp & chess_board.rooks)
-        
-        # Queens
-        score += PIECE_VALUES_STOCKFISH[chess.QUEEN] * chess.popcount(wp & chess_board.queens)
-        score -= PIECE_VALUES_STOCKFISH[chess.QUEEN] * chess.popcount(bp & chess_board.queens)
-
-        return score
-        
+    # def evaluate_piece_position(self, chess_board: chess.Board):
 
 
     def alpha_beta(self, chess_board: chess.Board, depth: int, alpha, beta, maximizing_player: bool):
