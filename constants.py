@@ -16,7 +16,7 @@ PIECE_VALUES = {
 CENTER_SQUARES = {chess.D4, chess.D5, chess.E4, chess.E5}
 
 # Game settings
-IS_BOT = True # Set to False for human vs bot, True for bot vs bot
+IS_BOT = False # Set to False for human vs bot, True for bot vs bot
 UPDATE_DELAY_MS = 160 # Delay between visual updates in milliseconds
 LAST_MOVE_ARROW = True # Set to True to display last move arrow
 CHECKING_MOVE_ARROW = False # Set to True to display checking move arrow

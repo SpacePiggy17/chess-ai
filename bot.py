@@ -94,18 +94,32 @@ class ChessBot:
         elif chess_board.can_claim_fifty_moves(): # Avoid fifty move rule
             return 0
         
-        # Evaluate the position
+        # Get game phase (0 to 256)
+        phase = self.get_game_phase(chess_board)
+        
+        # Material evaluation
         score = self.evaluate_material(chess_board) # Material evaluation
         
-        # score += self.evaluate_piece_position(chess_board)
+        # score += self.evaluate_piece_position(chess_board) TODO
+    
+        # Phase-dependent evaluations with smooth interpolation
+        # Middlegame and endgame evaluation weights
+        mg_pawn_structure = self.evaluate_pawn_structure(chess_board)
+        eg_pawn_structure = mg_pawn_structure // 2
+        
+        mg_king_safety = self.evaluate_king_safety(chess_board)
+        eg_king_safety = mg_king_safety // 4
+        
+        # King centralization (only meaningful in endgame)
+        mg_king_centralization = 0
+        eg_king_centralization = self.evaluate_king_centralization(chess_board, phase)
+        
+        # Interpolate between middlegame and endgame values
+        score += self.interpolate(mg_pawn_structure, eg_pawn_structure, phase)
+        score += self.interpolate(mg_king_safety, eg_king_safety, phase)
+        score += self.interpolate(mg_king_centralization, eg_king_centralization, phase)
 
-        # Pawn structure
-        score += self.evaluate_pawn_structure(chess_board)
-
-        # King safety
-        score += self.evaluate_king_safety(chess_board) # ! slow
-
-        # score += self.evaluate_mobility(chess_board) # Mobility
+        # score += self.evaluate_mobility(chess_board) # Mobility TODO
 
         # Cache the evaluation
         if key and score != 0: # Only store scores other than 0
@@ -202,46 +216,121 @@ class ChessBot:
         Can be extended with attack pattern recognition.
         """
         score = 0
-    
+        
+        # Precompute bitboards for pawns
+        white_pawns = chess_board.pieces_mask(chess.PAWN, chess.WHITE)
+        black_pawns = chess_board.pieces_mask(chess.PAWN, chess.BLACK)
+        
         # Evaluate pawn shield for both kings
         for color in chess.COLORS:
-            multiplier = 1 if color else -1
             king_square = chess_board.king(color)
             if king_square is None:
                 continue
             
+            # Create king area mask - includes squares in front of the king
             king_file = chess.square_file(king_square)
             king_rank = chess.square_rank(king_square)
-            pawn_piece = chess.Piece(chess.PAWN, color)
-        
-            # Check pawn shield
-            shield_score = 0
+            
+            # Direction for pawn shield (ahead of king based on color)
             shield_rank = king_rank + (1 if color else -1)
-            # Limit the file range
-            start_file = max(0, king_file - 1)
-            end_file = min(8, king_file + 2)
-            for file in range(start_file, end_file):
-                shield_square = chess.square(file, shield_rank)
-                if chess_board.piece_at(shield_square) == pawn_piece:
-                    shield_score += 10
+            
+            # Only create shield mask if the rank is valid (not at edge of board)
+            if 0 <= shield_rank < 8:
+                shield_mask = 0
                 
-            score += shield_score * multiplier
+                # Add the three squares in front of the king to the shield mask
+                for file_offset in [-1, 0, 1]:
+                    if 0 <= king_file + file_offset < 8:  # Check if file is valid
+                        shield_square = chess.square(king_file + file_offset, shield_rank)
+                        shield_mask |= (1 << shield_square)
+                
+                # Count pawns in the shield area
+                if color:  # White
+                    shield_pawns_count = chess.popcount(white_pawns & shield_mask)
+                    score += shield_pawns_count * 10
+                else:      # Black
+                    shield_pawns_count = chess.popcount(black_pawns & shield_mask)
+                    score -= shield_pawns_count * 10
         
         return score
 
-    def get_game_phase(chess_board: chess.Board):
+    def evaluate_king_centralization(self, chess_board: chess.Board, phase: int):
+        """
+        In endgames, kings should move to the center.
+        Returns a score based on king proximity to center.
+        Only meaningful in endgames, so weight by phase.
+        """
+        score = 0
+        
+        # Only apply when we're in endgame territory
+        endgame_weight = (256 - phase) // 16
+        if endgame_weight <= 0:
+            return 0
+            
+        # Center distance calculations
+        center_files = [3, 4]  # d and e files
+        center_ranks = [3, 4]  # 4th and 5th ranks
+        
+        # White king centralization
+        wk_square = chess_board.king(chess.WHITE)
+        if wk_square is not None:
+            wk_file = chess.square_file(wk_square)
+            wk_rank = chess.square_rank(wk_square)
+            wk_file_dist = min(abs(wk_file - f) for f in center_files)
+            wk_rank_dist = min(abs(wk_rank - r) for r in center_ranks)
+            wk_center_dist = wk_file_dist + wk_rank_dist
+            # Maximum distance = 6, so 6 - dist = 0-6 points, weighted by endgame_weight
+            score += (6 - wk_center_dist) * endgame_weight  
+        
+        # Black king centralization (subtract from score)
+        bk_square = chess_board.king(chess.BLACK)
+        if bk_square is not None:
+            bk_file = chess.square_file(bk_square)
+            bk_rank = chess.square_rank(bk_square)
+            bk_file_dist = min(abs(bk_file - f) for f in center_files)
+            bk_rank_dist = min(abs(bk_rank - r) for r in center_ranks)
+            bk_center_dist = bk_file_dist + bk_rank_dist
+            score -= (6 - bk_center_dist) * endgame_weight
+        
+        return score
+
+    def get_game_phase(self, chess_board: chess.Board):
         """
         Returns a value between 0 (endgame) and 256 (opening)
         based on remaining material
         """
-        npm = 0  # Non-pawn material
-        for piece_type in [chess.KNIGHT, chess.BISHOP, chess.ROOK, chess.QUEEN]:
-            npm += len(chess_board.pieces(piece_type, True)) * PIECE_VALUES[piece_type]
-            npm += len(chess_board.pieces(piece_type, False)) * PIECE_VALUES[piece_type]
+        # npm = 0  # Non-pawn material
+        # for piece_type in [chess.KNIGHT, chess.BISHOP, chess.ROOK, chess.QUEEN]:
+        #     npm += len(chess_board.pieces(piece_type, True)) * PIECE_VALUES[piece_type]
+        #     npm += len(chess_board.pieces(piece_type, False)) * PIECE_VALUES[piece_type]
     
+        # return min(npm, 256)
+
+        npm = 0  # Non-pawn material
+        
+        # Use bitboards for faster counting
+        wp = chess_board.occupied_co[chess.WHITE]
+        bp = chess_board.occupied_co[chess.BLACK]
+        
+        # Knights (320 points each)
+        npm += chess.popcount(wp & chess_board.knights) * PIECE_VALUES[chess.KNIGHT]
+        npm += chess.popcount(bp & chess_board.knights) * PIECE_VALUES[chess.KNIGHT]
+        
+        # Bishops (330 points each)
+        npm += chess.popcount(wp & chess_board.bishops) * PIECE_VALUES[chess.BISHOP]
+        npm += chess.popcount(bp & chess_board.bishops) * PIECE_VALUES[chess.BISHOP]
+        
+        # Rooks (500 points each)
+        npm += chess.popcount(wp & chess_board.rooks) * PIECE_VALUES[chess.ROOK]
+        npm += chess.popcount(bp & chess_board.rooks) * PIECE_VALUES[chess.ROOK]
+        
+        # Queens (900 points each)
+        npm += chess.popcount(wp & chess_board.queens) * PIECE_VALUES[chess.QUEEN]
+        npm += chess.popcount(bp & chess_board.queens) * PIECE_VALUES[chess.QUEEN]
+        
         return min(npm, 256)
 
-    def interpolate(mg_score, eg_score, phase):
+    def interpolate(self, mg_score, eg_score, phase):
         """
         Interpolate between middlegame and endgame scores
         based on game phase
@@ -260,6 +349,7 @@ class ChessBot:
             - Threats
         Avoids making a move and undoing it to evaluate the position.
         Returns a max heap of scored moves (-score, i, move).
+        TODO Implement killer moves
         """
         # Instead of creating a new list for all moves, consider:
         # 1. Pre-allocate the array based on typical move count
@@ -286,7 +376,7 @@ class ChessBot:
 
                 if victim and attacker:
                     # Prioritize capturing higher value pieces using lower value pieces
-                    score += 10_000 + PIECE_VALUES[victim.piece_type] - PIECE_VALUES[attacker.piece_type] >> 6 # Bit shift division by 128
+                    score += 10 * PIECE_VALUES[victim.piece_type] - PIECE_VALUES[attacker.piece_type]
 
             # Promotion bonus
             if move.promotion:
