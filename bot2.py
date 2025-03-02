@@ -3,11 +3,13 @@ import chess.polyglot # Zobrist hashing
 
 from enum import IntEnum # For flags
 from dataclasses import dataclass # For TT entries
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
+if TYPE_CHECKING:
+    from game import ChessGame # Only import while type checking
 
 from lru import LRU # For TT and history tables 
 
-from constants import DEPTH, PIECE_VALUES
+from constants import DEPTH, PIECE_VALUES_STOCKFISH, MAX_VALUE, MIN_VALUE, CHECKING_MOVE_ARROW
 
 import colors # Debug log colors
 import timeit # Debug timing
@@ -26,8 +28,12 @@ class TTEntry:
 
 class ChessBot:
     def __init__(self, game):
-        self.moves_checked = 0
-        self.game = game
+        self.game: "ChessGame" = game
+        self.moves_checked: int = 0
+
+    def display_checking_move_arrow(self, move):
+        self.game.checking_move = move
+        self.game.display_board(self.game.last_move)  # Update display
 
     def evaluate_position(self, chess_board: chess.Board, key: Optional[int] = None, has_legal_moves = False) -> float:
         """
@@ -68,18 +74,18 @@ class ChessBot:
         bp = chess_board.occupied_co[chess.BLACK]
         
         # Pawns
-        score += PIECE_VALUES[chess.PAWN] * chess.popcount(wp & chess_board.pawns)
-        score -= PIECE_VALUES[chess.PAWN] * chess.popcount(bp & chess_board.pawns)
+        score += PIECE_VALUES_STOCKFISH[chess.PAWN] * chess.popcount(wp & chess_board.pawns)
+        score -= PIECE_VALUES_STOCKFISH[chess.PAWN] * chess.popcount(bp & chess_board.pawns)
         
         # Knights
-        score += PIECE_VALUES[chess.KNIGHT] * chess.popcount(wp & chess_board.knights)
-        score -= PIECE_VALUES[chess.KNIGHT] * chess.popcount(bp & chess_board.knights)
+        score += PIECE_VALUES_STOCKFISH[chess.KNIGHT] * chess.popcount(wp & chess_board.knights)
+        score -= PIECE_VALUES_STOCKFISH[chess.KNIGHT] * chess.popcount(bp & chess_board.knights)
         
         # Bishops
         white_bishop_count = chess.popcount(wp & chess_board.bishops)
         black_bishop_count = chess.popcount( bp & chess_board.bishops)
-        score += PIECE_VALUES[chess.BISHOP] * white_bishop_count
-        score -= PIECE_VALUES[chess.BISHOP] * black_bishop_count
+        score += PIECE_VALUES_STOCKFISH[chess.BISHOP] * white_bishop_count
+        score -= PIECE_VALUES_STOCKFISH[chess.BISHOP] * black_bishop_count
         
         # Bishop pair bonus
         if white_bishop_count >= 2:
@@ -88,86 +94,70 @@ class ChessBot:
             score -= 50
         
         # Rooks
-        score += PIECE_VALUES[chess.ROOK] * chess.popcount(wp & chess_board.rooks)
-        score -= PIECE_VALUES[chess.ROOK] * chess.popcount(bp & chess_board.rooks)
+        score += PIECE_VALUES_STOCKFISH[chess.ROOK] * chess.popcount(wp & chess_board.rooks)
+        score -= PIECE_VALUES_STOCKFISH[chess.ROOK] * chess.popcount(bp & chess_board.rooks)
         
         # Queens
-        score += PIECE_VALUES[chess.QUEEN] * chess.popcount(wp & chess_board.queens)
-        score -= PIECE_VALUES[chess.QUEEN] * chess.popcount(bp & chess_board.queens)
+        score += PIECE_VALUES_STOCKFISH[chess.QUEEN] * chess.popcount(wp & chess_board.queens)
+        score -= PIECE_VALUES_STOCKFISH[chess.QUEEN] * chess.popcount(bp & chess_board.queens)
 
         return score
         
 
 
     def alpha_beta(self, chess_board: chess.Board, depth: int, alpha, beta, maximizing_player: bool):
-        legal_moves = chess_board.legal_moves
-
-        # Ternimal node check
+        # Terminal node check
         if depth == 0:
-            return self.evaluate_position(chess_board)
-        elif not legal_moves:
-            return self.evaluate_position(chess_board)
+            return self.evaluate_position(chess_board), None
+        legal_moves = list(chess_board.legal_moves)
+        if not legal_moves:
+            return self.evaluate_position(chess_board, has_legal_moves=False), None
         
+        best_move = None
         if maximizing_player:
-            value = float('-inf')
+            best_value = MIN_VALUE
             for move in legal_moves:
+                self.moves_checked += 1
+                if CHECKING_MOVE_ARROW and depth == DEPTH: # Display the root move
+                    self.display_checking_move_arrow(move)
+
                 chess_board.push(move)
-                temp_value = self.alpha_beta(chess_board, depth - 1, alpha, beta, False)
-                value = max(value, temp_value)
+                value = self.alpha_beta(chess_board, depth - 1, alpha, beta, False)[0]
                 chess_board.pop()
 
+                if value > best_value:
+                    best_value = value
+                    best_move = move
                 alpha = max(alpha, value)
                 if value >= beta:
                     break # Beta cutoff
-            return value
+
         else: # Minimizing player
-            value = float('inf')
+            best_value = MAX_VALUE
             for move in legal_moves:
+                self.moves_checked += 1
+                if CHECKING_MOVE_ARROW and depth == DEPTH: # Display the root move
+                    self.display_checking_move_arrow(move)
+
                 chess_board.push(move)
-                temp_value = self.alpha_beta(chess_board, depth - 1, alpha, beta, True)
-                value = min(value, temp_value)
+                value = self.alpha_beta(chess_board, depth - 1, alpha, beta, True)[0]
                 chess_board.pop()
+                if value < best_value:
+                    best_value = value
+                    best_move = move
                 beta = min(beta, value)
                 if value <= alpha:
                     break # Alpha cutoff
-            return value
 
-    def next_guess(self, alpha, beta, subtree_count):
-        return alpha + (beta - alpha) * (subtree_count - 1) / subtree_count
+        return best_value, best_move
 
-    def best_node_search(self, chess_board: chess.Board, alpha, beta, maximizing_player: bool):
-        # Get the number of subtrees to search
-        legal_moves = list(chess_board.legal_moves)
-        subtree_count = len(legal_moves)
 
-        if subtree_count == 0:
-            print("No legal moves")
-            return None
+    # TODO ---------------------------------------------
+    # def next_guess(self, alpha, beta, subtree_count):
+    #     return alpha + (beta - alpha) * (subtree_count - 1) / subtree_count
 
-        best_move = None
-        while beta - alpha >= 2:
-            gamma = self.next_guess(alpha, beta, subtree_count)
-            better_count = 0
-            candidate_move = None
-            
-            for move in legal_moves:
-                chess_board.push(move)
-                best_value = -self.alpha_beta(chess_board, 1, -gamma, -(gamma-1), not maximizing_player)
-                chess_board.pop()
-                
-                if best_value >= gamma:
-                    better_count += 1
-                    best_move = move
-            
-            # Update alpha-beta range based on the search results
-            if better_count > 1: # Too many nodes passed the test, raise the bar
-                alpha = gamma
-            elif better_count == 0: # No nodes passed the test, lower the bar
-                beta = gamma
-            else: # Found exactly one best node
-                break
-        
-        return best_move
+    # def best_node_search(self, chess_board: chess.Board, alpha, beta, maximizing_player: bool):
+    #     return 0
     
     
     def get_move(self, board: ChessBoard):
@@ -178,16 +168,10 @@ class ChessBot:
     
         self.moves_checked = 0
 
-        # Define the code to time
-        def timed_minimax():
-            best_move = self.best_node_search(chess_board, -1_000_000, 1_000_000, chess_board.turn)
-            return best_move
-
-        # Run minimax with timing
-        number = 1  # Number of executions
-        time_taken = timeit.timeit(timed_minimax, number=number) / number
-        best_move = timed_minimax()
-
+        # Run minimax once with manual timing
+        start_time = timeit.default_timer()
+        best_value, best_move = self.alpha_beta(chess_board, DEPTH, MIN_VALUE, MAX_VALUE, chess_board.turn)
+        time_taken = timeit.default_timer() - start_time
 
         # TODO move print stuff into function
         # Moves checked over time taken

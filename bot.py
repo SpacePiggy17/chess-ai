@@ -4,7 +4,7 @@ import chess.polyglot # Built-in Zobrist hashing
 import timeit
 import heapq # For priority queue
 
-from constants import PIECE_VALUES, CENTER_SQUARES, DEPTH, CHECKING_MOVE_ARROW
+from constants import PIECE_VALUES_STOCKFISH, CENTER_SQUARES, DEPTH, CHECKING_MOVE_ARROW
 import colors # Print logging colors
 
 from dataclasses import dataclass
@@ -126,18 +126,18 @@ class ChessBot:
         bp = chess_board.occupied_co[chess.BLACK]
         
         # Pawns
-        score += PIECE_VALUES[chess.PAWN] * chess.popcount(wp & chess_board.pawns)
-        score -= PIECE_VALUES[chess.PAWN] * chess.popcount(bp & chess_board.pawns)
+        score += PIECE_VALUES_STOCKFISH[chess.PAWN] * chess.popcount(wp & chess_board.pawns)
+        score -= PIECE_VALUES_STOCKFISH[chess.PAWN] * chess.popcount(bp & chess_board.pawns)
         
         # Knights
-        score += PIECE_VALUES[chess.KNIGHT] * chess.popcount(wp & chess_board.knights)
-        score -= PIECE_VALUES[chess.KNIGHT] * chess.popcount(bp & chess_board.knights)
+        score += PIECE_VALUES_STOCKFISH[chess.KNIGHT] * chess.popcount(wp & chess_board.knights)
+        score -= PIECE_VALUES_STOCKFISH[chess.KNIGHT] * chess.popcount(bp & chess_board.knights)
         
         # Bishops
         white_bishop_count = chess.popcount(wp & chess_board.bishops)
         black_bishop_count = chess.popcount( bp & chess_board.bishops)
-        score += PIECE_VALUES[chess.BISHOP] * white_bishop_count
-        score -= PIECE_VALUES[chess.BISHOP] * black_bishop_count
+        score += PIECE_VALUES_STOCKFISH[chess.BISHOP] * white_bishop_count
+        score -= PIECE_VALUES_STOCKFISH[chess.BISHOP] * black_bishop_count
         
         # Bishop pair bonus
         if white_bishop_count >= 2:
@@ -146,12 +146,12 @@ class ChessBot:
             score -= 50
         
         # Rooks
-        score += PIECE_VALUES[chess.ROOK] * chess.popcount(wp & chess_board.rooks)
-        score -= PIECE_VALUES[chess.ROOK] * chess.popcount(bp & chess_board.rooks)
+        score += PIECE_VALUES_STOCKFISH[chess.ROOK] * chess.popcount(wp & chess_board.rooks)
+        score -= PIECE_VALUES_STOCKFISH[chess.ROOK] * chess.popcount(bp & chess_board.rooks)
         
         # Queens
-        score += PIECE_VALUES[chess.QUEEN] * chess.popcount(wp & chess_board.queens)
-        score -= PIECE_VALUES[chess.QUEEN] * chess.popcount(bp & chess_board.queens)
+        score += PIECE_VALUES_STOCKFISH[chess.QUEEN] * chess.popcount(wp & chess_board.queens)
+        score -= PIECE_VALUES_STOCKFISH[chess.QUEEN] * chess.popcount(bp & chess_board.queens)
 
         return score
 
@@ -236,8 +236,8 @@ class ChessBot:
         """
         npm = 0  # Non-pawn material
         for piece_type in [chess.KNIGHT, chess.BISHOP, chess.ROOK, chess.QUEEN]:
-            npm += len(chess_board.pieces(piece_type, True)) * PIECE_VALUES[piece_type]
-            npm += len(chess_board.pieces(piece_type, False)) * PIECE_VALUES[piece_type]
+            npm += len(chess_board.pieces(piece_type, True)) * PIECE_VALUES_STOCKFISH[piece_type]
+            npm += len(chess_board.pieces(piece_type, False)) * PIECE_VALUES_STOCKFISH[piece_type]
     
         return min(npm, 256)
 
@@ -286,7 +286,7 @@ class ChessBot:
 
                 if victim and attacker:
                     # Prioritize capturing higher value pieces using lower value pieces
-                    score += 10_000 + PIECE_VALUES[victim.piece_type] - PIECE_VALUES[attacker.piece_type] >> 6 # Bit shift division by 128
+                    score += 10_000 + PIECE_VALUES_STOCKFISH[victim.piece_type] - PIECE_VALUES_STOCKFISH[attacker.piece_type] >> 6 # Bit shift division by 128
 
             # Promotion bonus
             if move.promotion:

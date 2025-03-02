@@ -4,7 +4,7 @@ import chess.polyglot # Built-in Zobrist hashing
 import timeit
 import heapq # For priority queue
 
-from constants import PIECE_VALUES, CENTER_SQUARES, DEPTH, CHECKING_MOVE_ARROW
+from constants import PIECE_VALUES_STOCKFISH, CENTER_SQUARES, DEPTH, CHECKING_MOVE_ARROW
 import colors # Print logging colors
 
 from dataclasses import dataclass
@@ -104,9 +104,9 @@ class ChessBot:
         score = 0
     
         # Basic material count
-        for piece in PIECE_VALUES: # ! REDUCE TIME
-            score += len(chess_board.pieces(piece, True)) * PIECE_VALUES[piece]
-            score -= len(chess_board.pieces(piece, False)) * PIECE_VALUES[piece]
+        for piece in PIECE_VALUES_STOCKFISH: # ! REDUCE TIME
+            score += len(chess_board.pieces(piece, True)) * PIECE_VALUES_STOCKFISH[piece]
+            score -= len(chess_board.pieces(piece, False)) * PIECE_VALUES_STOCKFISH[piece]
     
         # Bishop pair bonus
         if len(chess_board.pieces(chess.BISHOP, True)) >= 2:
@@ -181,8 +181,8 @@ class ChessBot:
         """
         npm = 0  # Non-pawn material
         for piece_type in [chess.KNIGHT, chess.BISHOP, chess.ROOK, chess.QUEEN]:
-            npm += len(chess_board.pieces(piece_type, True)) * PIECE_VALUES[piece_type]
-            npm += len(chess_board.pieces(piece_type, False)) * PIECE_VALUES[piece_type]
+            npm += len(chess_board.pieces(piece_type, True)) * PIECE_VALUES_STOCKFISH[piece_type]
+            npm += len(chess_board.pieces(piece_type, False)) * PIECE_VALUES_STOCKFISH[piece_type]
     
         return min(npm, 256)
 
@@ -233,7 +233,7 @@ class ChessBot:
 
                 if victim and attacker:
                     # Prioritize capturing higher value pieces using lower value pieces
-                    score += 10_000 + PIECE_VALUES[victim.piece_type] - PIECE_VALUES[attacker.piece_type]//100
+                    score += 10_000 + PIECE_VALUES_STOCKFISH[victim.piece_type] - PIECE_VALUES_STOCKFISH[attacker.piece_type]//100
 
             # Promotion bonus
             if move.promotion:
@@ -306,11 +306,11 @@ class ChessBot:
 
                 if victim and attacker:
                     # Material gain/loss from capture
-                    score += PIECE_VALUES[victim.piece_type] - PIECE_VALUES[attacker.piece_type]/100
+                    score += PIECE_VALUES_STOCKFISH[victim.piece_type] - PIECE_VALUES_STOCKFISH[attacker.piece_type]/100
 
             # Bonus for promotions
             if move.promotion:
-                score += PIECE_VALUES[move.promotion] - PIECE_VALUES[chess.PAWN]
+                score += PIECE_VALUES_STOCKFISH[move.promotion] - PIECE_VALUES_STOCKFISH[chess.PAWN]
 
             # Small bonus for center control
             if move.to_square in CENTER_SQUARES:

@@ -12,9 +12,20 @@ PIECE_VALUES = {
     chess.QUEEN: 900,
     chess.KING: 20000
 }
+PIECE_VALUES_STOCKFISH = {
+    chess.PAWN: 208,
+    chess.KNIGHT: 781,
+    chess.BISHOP: 825,
+    chess.ROOK: 1_276,
+    chess.QUEEN: 2_538,
+    chess.KING: 32_000
+}
 
-MAX_VALUE = PIECE_VALUES[chess.KING] + 1
-MIN_VALUE = -MAX_VALUE
+MAX_VALUE = float('inf')
+MIN_VALUE = float('-inf')
+
+# MAX_VALUE = 32_001
+# MIN_VALUE = -MAX_VALUE
 
 CENTER_SQUARES = {chess.D4, chess.D5, chess.E4, chess.E5} # Chess already has this built in
 
