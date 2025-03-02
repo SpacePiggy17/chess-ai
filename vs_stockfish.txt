@@ -1,0 +1,226 @@
+-------------------
+Player: White - 1
+Eval: 0
+-------------------
+Player: Black - 1
+Moves/Time: 3,253 / 0.19 s = 0.0585 ms/M
+Transposition table: 786 entries, 0.0420 MB
+Evaluation cache: 1,440 entries, 0.0873 MB
+FEN: rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 1
+Eval: 0
+-------------------
+Player: White - 2
+Eval: 100
+-------------------
+Player: Black - 2
+Moves/Time: 34,567 / 1.71 s = 0.0494 ms/M
+Transposition table: 5,320 entries, 0.2841 MB
+Evaluation cache: 21,000 entries, 1.2737 MB
+FEN: rnbqkbnr/pppp1ppp/8/4P3/8/8/PPP1PPPP/RNBQKBNR b KQkq - 0 2
+Eval: 100
+-------------------
+Player: White - 3
+Eval: 100
+-------------------
+Player: Black - 3
+Moves/Time: 31,431 / 1.65 s = 0.0525 ms/M
+Transposition table: 10,887 entries, 0.5814 MB
+Evaluation cache: 36,199 entries, 2.1956 MB
+FEN: rnbqk1nr/ppppbppp/8/4P3/4P3/8/PPP2PPP/RNBQKBNR b KQkq - 0 3
+Eval: 100
+-------------------
+Player: White - 4
+Eval: 100
+-------------------
+Player: Black - 4
+Moves/Time: 31,546 / 1.65 s = 0.0522 ms/M
+Transposition table: 16,793 entries, 0.8968 MB
+Evaluation cache: 51,940 entries, 3.1504 MB
+FEN: rnbq1knr/ppppbppp/8/4P3/4P3/2N5/PPP2PPP/R1BQKBNR b KQ - 2 4
+Eval: 100
+-------------------
+Player: White - 5
+Eval: 100
+-------------------
+Player: Black - 5
+Moves/Time: 54,578 / 2.85 s = 0.0521 ms/M
+Transposition table: 27,166 entries, 1.4508 MB
+Evaluation cache: 79,895 entries, 4.8459 MB
+FEN: rnbqk1nr/ppppbppp/8/4P3/2B1P3/2N5/PPP2PPP/R1BQK1NR b KQ - 4 5
+Eval: 100
+-------------------
+Player: White - 6
+Eval: 100
+-------------------
+Player: Black - 6
+Moves/Time: 47,597 / 2.82 s = 0.0592 ms/M
+Transposition table: 39,612 entries, 2.1155 MB
+Evaluation cache: 99,511 entries, 6.0357 MB
+FEN: rnbqkbnr/pppp1ppp/8/4P2Q/2B1P3/2N5/PPP2PPP/R1B1K1NR b KQ - 6 6
+Eval: 100
+-------------------
+Player: White - 7
+Eval: 100
+-------------------
+Player: Black - 7
+Moves/Time: 32,103 / 1.92 s = 0.0597 ms/M
+Transposition table: 47,222 entries, 2.5219 MB
+Evaluation cache: 100,000 entries, 6.0654 MB
+FEN: rnb1kbnr/ppppqppp/8/4P1BQ/2B1P3/2N5/PPP2PPP/R3K1NR b KQ - 8 7
+Eval: 100
+-------------------
+Player: White - 8
+Eval: 1000
+-------------------
+Player: Black - 8
+Moves/Time: 39,829 / 2.13 s = 0.0536 ms/M
+Transposition table: 55,661 entries, 2.9726 MB
+Evaluation cache: 100,000 entries, 6.0654 MB
+FEN: rnb1kbnr/ppp1Bppp/8/3pP2Q/2B1P3/2N5/PPP2PPP/R3K1NR b KQ - 0 8
+Eval: 620
+-------------------
+Player: White - 9
+Eval: 1000
+-------------------
+Player: Black - 9
+Moves/Time: 47,333 / 2.62 s = 0.0553 ms/M
+Transposition table: 65,582 entries, 3.5025 MB
+Evaluation cache: 100,000 entries, 6.0654 MB
+FEN: rnb1kBnr/ppp2ppp/8/4P2Q/2p1P3/2N5/PPP2PPP/R3K1NR b KQ - 0 9
+Eval: 670
+-------------------
+Player: White - 10
+Eval: 670
+-------------------
+Player: Black - 10
+Moves/Time: 48,221 / 2.22 s = 0.0460 ms/M
+Transposition table: 11,439 entries, 0.6109 MB
+Evaluation cache: 23,029 entries, 1.4056 MB
+FEN: rnb2knr/ppp2ppp/8/4P2Q/2p1P3/2N5/PPP2PPP/2KR2NR b - - 1 10
+Eval: 670
+-------------------
+Player: White - 11
+Eval: 670
+-------------------
+Player: Black - 11
+Moves/Time: 33,870 / 1.47 s = 0.0435 ms/M
+Transposition table: 17,292 entries, 0.9235 MB
+Evaluation cache: 40,266 entries, 2.4576 MB
+FEN: r1b2knr/pppn1ppp/8/4P3/2p1P2Q/2N5/PPP2PPP/2KR2NR b - - 3 11
+Eval: 670
+-------------------
+Player: White - 12
+Eval: 670
+-------------------
+Player: Black - 12
+Moves/Time: 46,352 / 2.01 s = 0.0434 ms/M
+Transposition table: 26,643 entries, 1.4229 MB
+Evaluation cache: 62,540 entries, 3.8171 MB
+FEN: r1b2k1r/pppnnppp/8/3NP3/2p1P2Q/8/PPP2PPP/2KR2NR b - - 5 12
+Eval: 670
+-------------------
+Player: White - 13
+Eval: 770
+-------------------
+Player: Black - 13
+Moves/Time: 59,258 / 2.39 s = 0.0403 ms/M
+Transposition table: 36,645 entries, 1.9571 MB
+Evaluation cache: 91,684 entries, 5.5959 MB
+FEN: r1b2k1r/ppNn1ppp/2n5/4P3/2p1P2Q/8/PPP2PPP/2KR2NR b - - 0 13
+Eval: 770
+-------------------
+Player: White - 14
+Eval: 770
+-------------------
+Player: Black - 14
+Moves/Time: 50,761 / 2.19 s = 0.0432 ms/M
+Transposition table: 46,352 entries, 2.4755 MB
+Evaluation cache: 100,000 entries, 6.0654 MB
+FEN: 1rb2k1r/ppNn1ppp/2n1P3/8/2p1P2Q/8/PPP2PPP/2KR2NR b - - 0 14
+Eval: 670
+-------------------
+Player: White - 15
+Eval: 770
+-------------------
+Player: Black - 15
+Moves/Time: 12,344 / 0.59 s = 0.0481 ms/M
+Transposition table: 49,294 entries, 2.6326 MB
+Evaluation cache: 100,000 entries, 6.0654 MB
+FEN: 1rb2k1r/pp1n2pp/2n1N3/8/2p1P2Q/8/PPP2PPP/2KR2NR b - - 0 15
+Eval: 770
+-------------------
+Player: White - 16
+Eval: 770
+-------------------
+Player: Black - 16
+Moves/Time: 50,109 / 2.42 s = 0.0484 ms/M
+Transposition table: 61,665 entries, 3.2933 MB
+Evaluation cache: 100,000 entries, 6.0654 MB
+FEN: 1rb3kr/pp1n2pp/2n1N3/6Q1/2p1P3/8/PPP2PPP/2KR2NR b - - 2 16
+Eval: 770
+-------------------
+Player: White - 17
+Eval: 770
+-------------------
+Player: Black - 17
+Moves/Time: 34,154 / 1.68 s = 0.0491 ms/M
+Transposition table: 70,938 entries, 3.7885 MB
+Evaluation cache: 100,000 entries, 6.0654 MB
+FEN: 1rb3kr/pp1n3p/2n1N1pQ/8/2p1P3/8/PPP2PPP/2KR2NR b - - 1 17
+Eval: 770
+-------------------
+Player: White - 18
+Eval: 770
+-------------------
+Player: Black - 18
+Moves/Time: 16,510 / 0.85 s = 0.0513 ms/M
+Transposition table: 76,354 entries, 4.0777 MB
+Evaluation cache: 100,000 entries, 6.0654 MB
+FEN: 1rb4r/pp1n1kQp/2n1N1p1/8/2p1P3/8/PPP2PPP/2KR2NR b - - 3 18
+Eval: 450
+-------------------
+Player: White - 19
+Eval: 450
+-------------------
+Player: Black - 19
+Moves/Time: 66,366 / 3.21 s = 0.0484 ms/M
+Transposition table: 96,219 entries, 5.1386 MB
+Evaluation cache: 100,000 entries, 5.9891 MB
+FEN: 1rb4r/pp1n2Qp/2n1k1p1/8/2p1P3/7N/PPP2PPP/2KR3R b - - 1 19
+Eval: 450
+-------------------
+Player: White - 20
+Eval: 770
+-------------------
+Player: Black - 20
+Moves/Time: 27,553 / 1.41 s = 0.0513 ms/M
+Transposition table: 104,961 entries, 5.6055 MB
+Evaluation cache: 100,000 entries, 6.1035 MB
+FEN: 1rb4r/pp1n2Qp/4k1p1/8/2pRP3/7N/PPP2PPP/2K4R b - - 0 20
+Eval: 770
+-------------------
+Player: White - 21
+Eval: 770
+-------------------
+Player: Black - 21
+Moves/Time: 4,137 / 0.23 s = 0.0563 ms/M
+Transposition table: 106,756 entries, 5.7014 MB
+Evaluation cache: 100,000 entries, 6.0654 MB
+FEN: 1rb4r/pp4Qp/4knp1/6N1/2pRP3/8/PPP2PPP/2K4R b - - 2 21
+Eval: 770
+-------------------
+Player: White - 22
+Eval: 770
+-------------------
+Player: Black - 22
+Moves/Time: 5,360 / 0.26 s = 0.0482 ms/M
+Transposition table: 108,166 entries, 5.7767 MB
+Evaluation cache: 100,000 entries, 6.1035 MB
+FEN: 1rb4r/ppQ4p/5np1/4k1N1/2pRP3/8/PPP2PPP/2K4R b - - 4 22
+Eval: 270
+-------------------
+Player: White - 23
+Eval: 10000
+-------------------
+Number of turns: 23
+Game Over! Result: Outcome(termination=<Termination.CHECKMATE: 1>, winner=True)

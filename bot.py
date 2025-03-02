@@ -12,6 +12,8 @@ from typing import Optional
 
 import sys
 
+from cachetools import LRUCache
+
 @dataclass
 class TranspositionEntry:
     depth: int
@@ -23,8 +25,9 @@ class ChessBot:
     def __init__(self, game=None):
         self.moves_checked = 0
         self.game = game # Reference to the game object
-        self.transposition_table = {}  # Dictionary to store positions
+        self.transposition_table = LRUCache(maxsize=1_000_000)  # LRU cache for transposition table
         self.position_history = {} # Dictionary to store position history
+        self.evaluation_cache = LRUCache(maxsize=300_000)  # LRU cache for evaluations
 
     # Built-in Zobrist hashing
     def store_position(self, chess_board: chess.Board, depth: int, value: float, flag: str, best_move: Optional[chess.Move], key: int = None):
@@ -45,7 +48,7 @@ class ChessBot:
             self.transposition_table[key].flag = flag
             self.transposition_table[key].best_move = best_move
 
-    def lookup_position(self, chess_board: chess.Board, key: Optional[int] = None) -> Optional[TranspositionEntry]:
+    def lookup_position(self, chess_board: chess.Board, key: int) -> Optional[TranspositionEntry]:
         """
         Lookup a position in the transposition table using chess.polyglot Zobrist hashing.
         Returns the entry if found, otherwise None.
@@ -61,37 +64,52 @@ class ChessBot:
         Check for threefold repetition in the position history.
         If there is 3 or more of the same position (the key counts as a repetition), return True.
         """
-        return self.position_history.get(key, 0) >= 2 # Check for threefold repetition
+        return self.position_history.get(key, 0) >= 3 # Check for threefold repetition
 
     def evaluate_position(self, chess_board: chess.Board, key: Optional[int] = None, has_legal_moves = False) -> float:
         """
         Evaluate the current position.
+        Uses the evaluation cache if available.
         Positive values favor white, negative values favor black.
         """
+        # Check evaluation cache
+        cached_value = self.evaluation_cache.get(key)
+        if cached_value is not None:
+            return cached_value
+        elif key in self.transposition_table: # If no cached value, check transposition table since we already checked this position
+            return 0
+    
         # Check expensive operations once
         if not has_legal_moves:
             has_legal_moves = bool(chess_board.legal_moves) # ! SLOW
         is_check = chess_board.is_check()
 
-        # Avoid game over state if not a win
+        # Evaluate game-ending conditions
         if not has_legal_moves: # No legal moves
             if is_check: # Checkmate
                 return -10_000 if chess_board.turn else 10_000
-            return 1_000 if chess_board.turn else -1_000 # Stalemate
+            return 0 # Stalemate
         elif chess_board.is_insufficient_material(): # Insufficient material for either side to win
-            return -1_000 if chess_board.turn else 1_000
+            return 0
         elif chess_board.can_claim_fifty_moves(): # Avoid fifty move rule
-            return -1_000 if chess_board.turn else 1_000
+            return 0
         
         # Evaluate the position
-        score = self.evaluate_material(chess_board) # Material and piece position evaluation
+        score = self.evaluate_material(chess_board) # Material evaluation
         
         # score += self.evaluate_piece_position(chess_board)
 
-        # score += self.evaluate_pawn_structure(chess_board) # Pawn structure # WARNING REALLY SLOW
-        # score += self.evaluate_king_safety(chess_board) # King safety # ~2s slower
+        # Pawn structure
+        score += self.evaluate_pawn_structure(chess_board)
+
+        # King safety
+        score += self.evaluate_king_safety(chess_board) # ! slow
 
         # score += self.evaluate_mobility(chess_board) # Mobility
+
+        # Cache the evaluation
+        if key and score != 0: # Only store scores other than 0
+            self.evaluation_cache[key] = score
        
         return score
 
@@ -103,16 +121,37 @@ class ChessBot:
         """
         score = 0
     
-        # Basic material count
-        for piece in PIECE_VALUES: # ! REDUCE TIME
-            score += len(chess_board.pieces(piece, True)) * PIECE_VALUES[piece]
-            score -= len(chess_board.pieces(piece, False)) * PIECE_VALUES[piece]
-    
+        # Count all pieces at once with direct bitboard access (much more optimized than provided version)
+        wp = chess_board.occupied_co[chess.WHITE]
+        bp = chess_board.occupied_co[chess.BLACK]
+        
+        # Pawns
+        score += PIECE_VALUES[chess.PAWN] * chess.popcount(wp & chess_board.pawns)
+        score -= PIECE_VALUES[chess.PAWN] * chess.popcount(bp & chess_board.pawns)
+        
+        # Knights
+        score += PIECE_VALUES[chess.KNIGHT] * chess.popcount(wp & chess_board.knights)
+        score -= PIECE_VALUES[chess.KNIGHT] * chess.popcount(bp & chess_board.knights)
+        
+        # Bishops
+        white_bishop_count = chess.popcount(wp & chess_board.bishops)
+        black_bishop_count = chess.popcount( bp & chess_board.bishops)
+        score += PIECE_VALUES[chess.BISHOP] * white_bishop_count
+        score -= PIECE_VALUES[chess.BISHOP] * black_bishop_count
+        
         # Bishop pair bonus
-        if len(chess_board.pieces(chess.BISHOP, True)) >= 2:
+        if white_bishop_count >= 2:
             score += 50
-        if len(chess_board.pieces(chess.BISHOP, False)) >= 2:
+        if black_bishop_count >= 2:
             score -= 50
+        
+        # Rooks
+        score += PIECE_VALUES[chess.ROOK] * chess.popcount(wp & chess_board.rooks)
+        score -= PIECE_VALUES[chess.ROOK] * chess.popcount(bp & chess_board.rooks)
+        
+        # Queens
+        score += PIECE_VALUES[chess.QUEEN] * chess.popcount(wp & chess_board.queens)
+        score -= PIECE_VALUES[chess.QUEEN] * chess.popcount(bp & chess_board.queens)
 
         return score
 
@@ -120,29 +159,41 @@ class ChessBot:
         """
         Checks for common pawn weaknesses.
         Evaluates pawn chains and islands.
-        Identifies passed pawns and their value.
+        Optimized version using bitboard operations.
         """
         score = 0
-    
-        # Evaluate for both colors
-        for color in [True, False]:
-            multiplier = 1 if color else -1
-            pawns = chess_board.pieces(chess.PAWN, color)
+
+        file_masks = chess.BB_FILES
+
+        # Process both colors at once with direct bitboard manipulation
+        white_pawns = chess_board.pieces_mask(chess.PAWN, chess.WHITE)
+        black_pawns = chess_board.pieces_mask(chess.PAWN, chess.BLACK)
         
-            # Check each file for isolated pawns
-            for file in range(8):
-                pawns_in_file = sum(1 for pawn in pawns
-                                if chess.square_file(pawn) == file)
-                if pawns_in_file > 0:
-                    # Check adjacent files
-                    adjacent_pawns = sum(1 for pawn in pawns
-                        if chess.square_file(pawn) in [file-1, file+1])
-                    if adjacent_pawns == 0:
-                        score -= 20 * multiplier  # Isolated pawn penalty
-                    
-                if pawns_in_file > 1:
-                    score -= 10 * multiplier  # Doubled pawn penalty
+        # Evaluate isolated pawns for both colors in one pass
+        for file in range(8):
+            # Pawns in this file
+            white_pawns_in_file = chess.popcount(white_pawns & file_masks[file])
+            black_pawns_in_file = chess.popcount(black_pawns & file_masks[file])
+            
+            # Calculate adjacent files mask once per iteration
+            adjacent_mask = 0
+            if file > 0:
+                adjacent_mask |= file_masks[file - 1]
+            if file < 7:
+                adjacent_mask |= file_masks[file + 1]
+            
+            # Check for isolated pawns
+            if white_pawns_in_file > 0 and chess.popcount(white_pawns & adjacent_mask) == 0:
+                score -= 20  # Isolated white pawn penalty
+            if black_pawns_in_file > 0 and chess.popcount(black_pawns & adjacent_mask) == 0:
+                score += 20  # Isolated black pawn penalty
                 
+            # Check for doubled pawns
+            if white_pawns_in_file > 1:
+                score -= 10  # Doubled white pawn penalty
+            if black_pawns_in_file > 1:
+                score += 10  # Doubled black pawn penalty
+
         return score
 
     def evaluate_king_safety(self, chess_board: chess.Board):
@@ -153,7 +204,7 @@ class ChessBot:
         score = 0
     
         # Evaluate pawn shield for both kings
-        for color in [True, False]:
+        for color in chess.COLORS:
             multiplier = 1 if color else -1
             king_square = chess_board.king(color)
             if king_square is None:
@@ -161,13 +212,17 @@ class ChessBot:
             
             king_file = chess.square_file(king_square)
             king_rank = chess.square_rank(king_square)
+            pawn_piece = chess.Piece(chess.PAWN, color)
         
             # Check pawn shield
             shield_score = 0
-            for file in range(max(0, king_file - 1), min(8, king_file + 2)):
-                shield_rank = king_rank + (1 if color else -1)
+            shield_rank = king_rank + (1 if color else -1)
+            # Limit the file range
+            start_file = max(0, king_file - 1)
+            end_file = min(8, king_file + 2)
+            for file in range(start_file, end_file):
                 shield_square = chess.square(file, shield_rank)
-                if chess_board.piece_at(shield_square) == chess.Piece(chess.PAWN, color):
+                if chess_board.piece_at(shield_square) == pawn_piece:
                     shield_score += 10
                 
             score += shield_score * multiplier
@@ -204,22 +259,21 @@ class ChessBot:
             - Promotion
             - Threats
         Avoids making a move and undoing it to evaluate the position.
-        Returns a list of moves sorted by importance.
-        TODO Turn into generator
+        Returns a max heap of scored moves (-score, i, move).
         """
+        # Instead of creating a new list for all moves, consider:
+        # 1. Pre-allocate the array based on typical move count
+        # 2. Use move ordering heuristics (killer moves, history heuristic)
+        # 3. For shallow depths, consider simplified sorting
         moves_heap = []
+
+        # Calculate once
+        ep_square = chess_board.ep_square
+        turn = chess_board.turn
+        ep_pawn_delta = 8 if turn else -8
+
         for i, move in enumerate(chess_board.legal_moves): # ! REDUCE TIME
             score = 0
-                
-            # if chess_board.is_checkmate(): # In checkmate
-            #     score -= 100_000
-
-            # Piece is pinned to the king
-            # if chess_board.is_pinned(chess_board.turn, move.from_square):
-            #     score -= 50_000
-
-            # if chess_board.is_check(): # Is in check
-            #     score -= 10_000
 
             # Capturing a piece bonus
             if chess_board.is_capture(move):
@@ -227,13 +281,12 @@ class ChessBot:
                 attacker = chess_board.piece_at(move.from_square)
 
                 # Handle en passant captures
-                if victim is None and move.to_square == chess_board.ep_square:
-                    victim_square = move.to_square + (8 if chess_board.turn else -8)
-                    victim = chess_board.piece_at(victim_square)
+                if victim is None and move.to_square == ep_square:
+                    victim = chess_board.piece_at(move.to_square + ep_pawn_delta)
 
                 if victim and attacker:
                     # Prioritize capturing higher value pieces using lower value pieces
-                    score += 10_000 + PIECE_VALUES[victim.piece_type] - PIECE_VALUES[attacker.piece_type]//100
+                    score += 10_000 + PIECE_VALUES[victim.piece_type] - PIECE_VALUES[attacker.piece_type] >> 6 # Bit shift division by 128
 
             # Promotion bonus
             if move.promotion:
@@ -243,87 +296,24 @@ class ChessBot:
             if move.to_square in CENTER_SQUARES:
                 score += 100
 
-            # if score == 0: # Move is not positive or negative
+            # Negative score for max-heap
+            moves_heap.append((-score, i, move)) # Add i for comparision if scores are equal
+
+        # Heapify to sort by score once
+        heapq.heapify(moves_heap) # Turn into max heap
+        return moves_heap
 
 
-
-            # board.make_move(move)
-            # chess_board = board.get_board_state()
-
-            # if chess_board.is_checkmate(): # Results in checkmate
-            #     score += 100_000
-
-            # if chess_board.is_check(): # Results in check
-            #     score += 10_000
-
-            # # Find any pieces that were just pinned by the move
-            # for square in chess_board.piece_map():  # Check all pieces
-            #     if chess_board.color_at(square) == chess_board.turn: # Opponent pieces
-            #         if chess_board.is_pinned(chess_board.turn, square): # Opponent pinned
-            #             score += 9_000
-            #     else: # Our pieces
-            #         if chess_board.is_pinned(not chess_board.turn, square): # Us pinned
-            #             score -= 20_000
-
-            # for square in chess_board.attacks(move.to_square): # Move is a threat to capture a piece
-            #     if chess_board.is_attacked_by(not chess_board.turn, square): # Opponent threatened
-            #         victim = chess_board.piece_at(square)
-            #         attacker = chess_board.piece_at(move.to_square)
-                
-            #         if victim and attacker and victim.color != attacker.color:
-            #             # Prioritize endangering higher value pieces using lower value pieces
-            #             score += 1_000 + PIECE_VALUES[victim.piece_type] - PIECE_VALUES[attacker.piece_type]/100
-
-            # board.undo_move()
-                
-            heapq.heappush(moves_heap, (-score, i, move))
-
-        return [entry[2] for entry in moves_heap]
-
-    def sorted_move_generator(self, chess_board: chess.Board):
+    def has_sufficient_material(self, chess_board: chess.Board, side: bool):
         """
-        Generator that yields moves in order of importance:
-        1. Captures by material gain
-        2. Promotions
-        3. Center control moves
-        4. All other moves
+        Check if a side has sufficient material to avoid zugzwang positions.
+        Returns True if the side has any piece other than king and pawns.
         """
-        good_moves = []
-        other_moves = []
-        
-        for move in chess_board.legal_moves:
-            score = 0
-                
-            # Score captures
-            if chess_board.is_capture(move):
-                victim = chess_board.piece_at(move.to_square)
-                attacker = chess_board.piece_at(move.from_square)
+        pieces = chess_board.occupied_co[side]
+        non_pawn_pieces = pieces & ~chess_board.pawns & ~chess_board.kings
+        return chess.popcount(non_pawn_pieces) > 0
 
-                # Handle en passant captures
-                if victim is None and move.to_square == chess_board.ep_square:
-                    victim_square = move.to_square + (8 if chess_board.turn else -8)
-                    victim = chess_board.piece_at(victim_square)
-
-                if victim and attacker:
-                    # Material gain/loss from capture
-                    score += PIECE_VALUES[victim.piece_type] - PIECE_VALUES[attacker.piece_type]/100
-
-            # Bonus for promotions
-            if move.promotion:
-                score += PIECE_VALUES[move.promotion] - PIECE_VALUES[chess.PAWN]
-
-            # Small bonus for center control
-            if move.to_square in CENTER_SQUARES:
-                score += 0.1
-                
-            # Use a single heap for all moves
-            heapq.heappush(good_moves, (-score, id(move), move))
-
-        # Yield all moves in order of score
-        while good_moves:
-            yield heapq.heappop(good_moves)[2]
-
-    def minimax_alpha_beta(self, board: ChessBoard, remaining_depth: int, alpha: int, beta: int, maximizing_player: bool):
+    def minimax_alpha_beta(self, board: ChessBoard, remaining_depth: int, alpha: int, beta: int, maximizing_player: bool, allow_null_move: bool = True):
         """
         Minimax algorithm with alpha-beta pruning.
         Returns (best_value, best_move) tuple.
@@ -341,29 +331,53 @@ class ChessBot:
 
         # Check for threefold repetition
         if self.check_for_threefold_repetition(key):
-            if remaining_depth != DEPTH: # If not root depth, return draw
-                return -1_000 if chess_board.turn else 1_000, None
-        else:
-            # Lookup position in transposition table (skip if threefold repetition and continue evaluation)
-            transposition = self.lookup_position(chess_board, key)
-            if transposition and transposition.depth >= remaining_depth:
-                stored_value: float = transposition.value
-                if transposition.flag == 'EXACT':
-                    return stored_value, transposition.best_move
-                elif transposition.flag == 'LOWERBOUND':
-                    alpha = max(alpha, stored_value)
-                elif transposition.flag == 'UPPERBOUND':
-                    beta = min(beta, stored_value)
-                if beta <= alpha:
-                    return stored_value, transposition.best_move
+            return 0, None
+        
+        # Lookup position in transposition table (skip if threefold repetition and continue evaluation)
+        transposition = self.lookup_position(chess_board, key)
+        if transposition and transposition.depth >= remaining_depth:
+            stored_value: float = transposition.value
+            if transposition.flag == 'EXACT':
+                return stored_value, transposition.best_move
+            elif transposition.flag == 'LOWERBOUND':
+                alpha = max(alpha, stored_value)
+            elif transposition.flag == 'UPPERBOUND':
+                beta = min(beta, stored_value)
+            if beta <= alpha:
+                return stored_value, transposition.best_move
+
+        # Null-Move Pruning
+        # Only try null move if:
+        # 1. We're not in check (can't skip a turn when in check)
+        # 2. We have sufficient material (avoiding zugzwang positions in endgames)
+        # 3. We have depth > 2 (avoid incorrect evaluations near leaf nodes)
+        # 4. allow_null_move flag is True (to prevent consecutive null moves)
+        R = 2  # Null-move reduction factor (can be adjusted)
+        if (allow_null_move and 
+            remaining_depth >= 3 and 
+            not chess_board.is_check() and
+            self.has_sufficient_material(chess_board, chess_board.turn)):
+            
+            # Skip turn and do a reduced depth search
+            board.make_null_move()
+            null_value = -self.minimax_alpha_beta(
+                board, remaining_depth - 1 - R, -beta, -beta + 1, 
+                not maximizing_player, False)[0]
+            board.undo_null_move()
+            
+            # If the reduced depth search exceeds beta, we can prune this branch
+            if null_value >= beta:
+                return null_value, None
 
         best_move = None
         original_alpha = alpha
 
+        moves_heap = self.get_sorted_moves(chess_board)
+
         if maximizing_player:
             best_value = float('-inf')
-            for move in self.get_sorted_moves(chess_board):
-            # for move in self.sorted_move_generator(chess_board):
+            while moves_heap:
+                move = heapq.heappop(moves_heap)[2] # Get move from heap
                 self.moves_checked += 1
                 if CHECKING_MOVE_ARROW and remaining_depth == DEPTH: # Display the root move
                     self.game.checking_move = move
@@ -383,8 +397,8 @@ class ChessBot:
 
         else: # Minimizing player
             best_value = float('inf')
-            for move in self.get_sorted_moves(chess_board):
-            # for move in self.sorted_move_generator(chess_board):
+            while moves_heap:
+                move = heapq.heappop(moves_heap)[2] # Get move from heap
                 self.moves_checked += 1
                 if CHECKING_MOVE_ARROW and remaining_depth == DEPTH: # Display the root move
                     self.game.checking_move = move
@@ -425,9 +439,8 @@ class ChessBot:
         # Update position history with other player's move
         self.update_position_history(chess.polyglot.zobrist_hash(board.get_board_state())) # Update position history
 
-
         # Define the code to time
-        def timed_minimax():
+        def timed_minimax():# -> tuple[float, None] | tuple[Literal[-1000, 1000], None] | tuple[float, Move | None]:
             return self.minimax_alpha_beta(board, DEPTH, float('-inf'), float('inf'), board.get_board_state().turn)
 
         # Run minimax with timing
@@ -443,10 +456,21 @@ class ChessBot:
         print(f"Moves/Time: {colors.BOLD}{colors.get_moves_color(self.moves_checked)}{self.moves_checked:,}{colors.RESET} / "
             f"{colors.BOLD}{colors.get_move_time_color(time_taken)}{time_taken:.2f}{colors.RESET} s = "
             f"{colors.BOLD}{colors.CYAN}{time_per_move * 1000:.4f}{colors.RESET} ms/M")
-        # Size of transposition table
-        print(f"Transposition table: {colors.BOLD}{colors.MAGENTA}{len(self.transposition_table):,}{colors.RESET} entries, "
-            f"{colors.BOLD}{colors.CYAN}{sys.getsizeof(self.transposition_table)/ (1024 * 1024):.4f}{colors.RESET} MB")
 
+        # Calculate memory usage more accurately
+        tt_entry_size = sys.getsizeof(TranspositionEntry(0, 0.0, "", None))
+        tt_size_mb = len(self.transposition_table) * tt_entry_size / (1024 * 1024)
+        eval_size_mb = sum(sys.getsizeof(k) + sys.getsizeof(v) for k, v in list(self.evaluation_cache.items())[:10]) / 10
+        eval_size_mb = eval_size_mb * len(self.evaluation_cache) / (1024 * 1024)
+        transposition_table_entries = len(self.transposition_table)
+
+        # Print cache statistics
+        print(f"Transposition table: {colors.BOLD}{colors.MAGENTA}{len(self.transposition_table):,}{colors.RESET} entries, "
+            f"{colors.BOLD}{colors.CYAN}{tt_size_mb:.4f}{colors.RESET} MB")
+        print(f"Evaluation cache: {colors.BOLD}{colors.MAGENTA}{len(self.evaluation_cache):,}{colors.RESET} entries, "
+              f"{colors.BOLD}{colors.CYAN}{eval_size_mb:.4f}{colors.RESET} MB")
+
+        # Print the FEN
         print(f"FEN: {board.get_board_state().fen()}")
 
         return best_move

@@ -32,6 +32,14 @@ class ChessBoard:
         if self.board.move_stack:
             self.board.pop()
     
+    def make_null_move(self):
+        """Make a null move by simply pushing a null move to the stack."""
+        self.board.push(chess.Move.null())
+
+    def undo_null_move(self):
+        """Undo a null move by popping from the stack."""
+        self.board.pop()
+
     def is_game_over(self):
         """Returns True if the game is over."""
         return self.board.is_game_over()
