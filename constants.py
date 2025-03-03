@@ -33,7 +33,7 @@ START_NPM = PIECE_VALUES_STOCKFISH[chess.KNIGHT] * 4 + \
 NPM_SCALAR = (START_NPM // 256) + 1
 
 # Game stages
-GameStage: TypeAlias = int
+GameStage: TypeAlias = np.int8
 MIDGAME: GameStage = 0
 ENDGAME: GameStage = 1
 

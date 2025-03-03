@@ -1,8 +1,9 @@
 from board import ChessBoard
 import chess.polyglot  # Zobrist hashing
 
-from dataclasses import dataclass  # For TT entries
+from dataclasses import dataclass  # For TT entries and scores
 from typing_extensions import TypeAlias  # For flags
+import numpy as np
 from typing import Optional, TYPE_CHECKING
 if TYPE_CHECKING:
     from game import ChessGame  # Only import while type checking
@@ -17,7 +18,7 @@ import timeit  # Debug timing
 
 
 # Transposition table entry flags
-Flag: TypeAlias = int
+Flag: TypeAlias = np.int8
 EXACT: Flag = 1
 LOWERBOUND: Flag = 2
 UPPERBOUND: Flag = 3
@@ -25,23 +26,27 @@ UPPERBOUND: Flag = 3
 # Transposition table entry
 @dataclass
 class TTEntry:
-    depth: int
-    value: int
+    depth: np.int8
+    value: np.int16
     flag: Flag
     best_move: Optional[chess.Move]
 
 # Score class to store scores and update them
 @dataclass
 class Score: # Positive values favor white, negative values favor black
-    material: int # Material score
-    mg: int # Midgame score
-    eg: int # Endgame score
-    npm: int # Non-pawn material (for phase calculation)
+    __slots__ = ["material", "mg", "eg", "npm"] # Optimization for memory usage
+    material: np.int16 # Material score
+    mg: np.int16 # Midgame score
+    eg: np.int16 # Endgame score
+    npm: np.int16 # Non-pawn material (for phase calculation)
 
     def update(self, chess_board: chess.Board, move: chess.Move):
         """
         Updates the material, midgame, endgame, and non-pawn material scores based on the move.
+        Returns the original values before the move was made.
         """
+        original_values = (self.material, self.mg, self.eg, self.npm)
+
         from_square = move.from_square
         to_square = move.to_square
         promotion = move.promotion
@@ -49,24 +54,30 @@ class Score: # Positive values favor white, negative values favor black
         piece = chess_board.piece_at(from_square)
         captured_piece = chess_board.piece_at(to_square)
 
-        is_en_passant = chess_board.is_en_passant(move)
-
         if piece.piece_type == chess.KING:
             # Update rook scores for castling
             if from_square == chess.E1: # White king
                 if to_square == chess.G1: # White kingside castle
-                    self.mg += PSQT[MIDGAME][chess.ROOK][FLIP[chess.F1]] - PSQT[MIDGAME][chess.ROOK][FLIP[chess.H1]]
-                    self.eg += PSQT[ENDGAME][chess.ROOK][FLIP[chess.F1]] - PSQT[ENDGAME][chess.ROOK][FLIP[chess.H1]]
+                    mg_table = PSQT[MIDGAME][chess.ROOK]
+                    eg_table = PSQT[ENDGAME][chess.ROOK]
+                    self.mg += mg_table[FLIP[chess.F1]] - mg_table[FLIP[chess.H1]]
+                    self.eg += eg_table[FLIP[chess.F1]] - eg_table[FLIP[chess.H1]]
                 elif to_square == chess.C1: # White queenside castle
-                    self.mg += PSQT[MIDGAME][chess.ROOK][FLIP[chess.D1]] - PSQT[MIDGAME][chess.ROOK][FLIP[chess.A1]]
-                    self.eg += PSQT[ENDGAME][chess.ROOK][FLIP[chess.D1]] - PSQT[ENDGAME][chess.ROOK][FLIP[chess.A1]]
+                    mg_table = PSQT[MIDGAME][chess.ROOK]
+                    eg_table = PSQT[ENDGAME][chess.ROOK]
+                    self.mg += mg_table[FLIP[chess.D1]] - mg_table[FLIP[chess.A1]]
+                    self.eg += eg_table[FLIP[chess.D1]] - eg_table[FLIP[chess.A1]]
             elif from_square == chess.E8: # Black king
                 if to_square == chess.G8: # Black kingside castle
-                    self.mg -= PSQT[MIDGAME][chess.ROOK][chess.F8] - PSQT[MIDGAME][chess.ROOK][chess.H8]
-                    self.eg -= PSQT[ENDGAME][chess.ROOK][chess.F8] - PSQT[ENDGAME][chess.ROOK][chess.H8]
+                    mg_table = PSQT[MIDGAME][chess.ROOK]
+                    eg_table = PSQT[ENDGAME][chess.ROOK]
+                    self.mg -= mg_table[chess.F8] - mg_table[chess.H8]
+                    self.eg -= eg_table[chess.F8] - eg_table[chess.H8]
                 elif to_square == chess.C8: # Black queenside castle
-                    self.mg -= PSQT[MIDGAME][chess.ROOK][chess.D8] - PSQT[MIDGAME][chess.ROOK][chess.A8]
-                    self.eg -= PSQT[ENDGAME][chess.ROOK][chess.D8] - PSQT[ENDGAME][chess.ROOK][chess.A8]
+                    mg_table = PSQT[MIDGAME][chess.ROOK]
+                    eg_table = PSQT[ENDGAME][chess.ROOK]
+                    self.mg -= mg_table[chess.D8] - mg_table[chess.A8]
+                    self.eg -= eg_table[chess.D8] - eg_table[chess.A8]
 
         # Update position scores for moving piece
         if promotion: # Promotion
@@ -80,14 +91,21 @@ class Score: # Positive values favor white, negative values favor black
                 self.mg -= PSQT[MIDGAME][promotion][to_square] - PSQT[MIDGAME][chess.PAWN][from_square]
                 self.eg -= PSQT[ENDGAME][promotion][to_square] - PSQT[ENDGAME][chess.PAWN][from_square]
         else: # Normal move
+            mg_table = PSQT[MIDGAME][piece.piece_type]
+            eg_table = PSQT[ENDGAME][piece.piece_type]
             if piece.color: # White move
-                self.mg += PSQT[MIDGAME][piece.piece_type][FLIP[to_square]] - PSQT[MIDGAME][piece.piece_type][FLIP[from_square]]
-                self.eg += PSQT[ENDGAME][piece.piece_type][FLIP[to_square]] - PSQT[ENDGAME][piece.piece_type][FLIP[from_square]]
+                self.mg += mg_table[FLIP[to_square]] - mg_table[FLIP[from_square]]
+                self.eg += eg_table[FLIP[to_square]] - eg_table[FLIP[from_square]]
             else: # Black move
-                self.mg -= PSQT[MIDGAME][piece.piece_type][to_square] - PSQT[MIDGAME][piece.piece_type][from_square]
-                self.eg -= PSQT[ENDGAME][piece.piece_type][to_square] - PSQT[ENDGAME][piece.piece_type][from_square]
+                self.mg -= mg_table[to_square] - mg_table[from_square]
+                self.eg -= eg_table[to_square] - eg_table[from_square]
 
-        if captured_piece: # Capture
+        # Check for captures - only check en passant if no direct capture
+        is_en_passant = False
+        if not captured_piece:
+            # Only check for en passant if there's no direct capture
+            is_en_passant = chess_board.is_en_passant(move)
+        if captured_piece or is_en_passant: # Capture
             if is_en_passant: # Get the captured pawn from en passant
                 # Update captured piece and square
                 to_square += 8 if piece.color else -8
@@ -105,6 +123,8 @@ class Score: # Positive values favor white, negative values favor black
             # Update npm score
             if captured_piece.piece_type != chess.PAWN:
                 self.npm -= PIECE_VALUES_STOCKFISH[captured_piece.piece_type]
+
+        return original_values
 
     def initialize_scores(self, chess_board: chess.Board):
         """
@@ -144,7 +164,7 @@ class Score: # Positive values favor white, negative values favor black
         if black_bishop_count >= 2:
             self.material -= PIECE_VALUES_STOCKFISH[chess.PAWN] >> 1
 
-    def get_interpolated_score(self) -> int:
+    def get_interpolated_score(self) -> np.int16:
         """Interpolates between midgame and endgame scores based on phase."""
         phase = self.npm // NPM_SCALAR # Phase value between 0 and 256 (0 = endgame, 256 = opening)
         return ((self.mg * phase) + (self.eg * (256 - phase))) // 256
@@ -189,7 +209,7 @@ class ChessBot:
 
     # def quiescence(self, chess_board: chess.Board, alpha, beta, depth):
 
-    def alpha_beta(self, chess_board: chess.Board, depth: int, alpha, beta, maximizing_player: bool, score: Score):
+    def alpha_beta(self, chess_board: chess.Board, depth: np.int8, alpha, beta, maximizing_player: bool, score: Score):
         # Terminal node check
         if depth == 0:
             return self.evaluate_position(chess_board, score), None
@@ -205,14 +225,12 @@ class ChessBot:
                 if CHECKING_MOVE_ARROW and depth >= RENDER_DEPTH:  # Display the root move
                     self.display_checking_move_arrow(move)
 
-                old_material, old_mg, old_eg, old_npm = score.material, score.mg, score.eg, score.npm
-
-                score.update(chess_board, move)
+                original_values = score.update(chess_board, move)
                 chess_board.push(move)
                 value = self.alpha_beta(chess_board, depth - 1, alpha, beta, False, score)[0]
                 chess_board.pop()
 
-                score.material, score.mg, score.eg, score.npm = old_material, old_mg, old_eg, old_npm
+                score.material, score.mg, score.eg, score.npm = original_values
 
                 if value > best_value:
                     best_value = value
@@ -228,14 +246,12 @@ class ChessBot:
                 if CHECKING_MOVE_ARROW and depth >= RENDER_DEPTH:  # Display the root move
                     self.display_checking_move_arrow(move)
 
-                old_material, old_mg, old_eg, old_npm = score.material, score.mg, score.eg, score.npm
-
-                score.update(chess_board, move)
+                original_values = score.update(chess_board, move)
                 chess_board.push(move)
                 value = self.alpha_beta(chess_board, depth - 1, alpha, beta, True, score)[0]
                 chess_board.pop()
 
-                score.material, score.mg, score.eg, score.npm = old_material, old_mg, old_eg, old_npm
+                score.material, score.mg, score.eg, score.npm = original_values
 
                 if value < best_value:
                     best_value = value
@@ -271,7 +287,8 @@ class ChessBot:
         time_per_move = time_taken / self.moves_checked if self.moves_checked > 0 else 0
         print(f"Moves/Time: {colors.BOLD}{colors.get_moves_color(self.moves_checked)}{self.moves_checked:,}{colors.RESET} / "
               f"{colors.BOLD}{colors.get_move_time_color(time_taken)}{time_taken:.2f}{colors.RESET} s = "
-              f"{colors.BOLD}{colors.CYAN}{time_per_move * 1000:.4f}{colors.RESET} ms/M")
+              f"{colors.BOLD}{colors.CYAN}{time_per_move * 1000:.4f}{colors.RESET} ms/M, "
+              f"{colors.BOLD}{colors.CYAN}{1 / time_per_move:,.0f}{colors.RESET} M/s")
 
         # # Calculate memory usage more accurately
         # tt_entry_size = sys.getsizeof(TranspositionEntry(0, 0.0, "", None))
