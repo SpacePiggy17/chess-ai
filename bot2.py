@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 
 from lru import LRU  # For TT and history tables
 
-from constants import DEPTH, MAX_VALUE, MIN_VALUE, CHECKING_MOVE_ARROW, \
+from constants import DEPTH, MAX_VALUE, MIN_VALUE, CHECKING_MOVE_ARROW, RENDER_DEPTH, \
     PIECE_VALUES_STOCKFISH, FLIP, MIDGAME, ENDGAME, PSQT, START_NPM, NPM_SCALAR
 
 import colors  # Debug log colors
@@ -202,7 +202,7 @@ class ChessBot:
             best_value = MIN_VALUE
             for move in legal_moves:
                 self.moves_checked += 1
-                if CHECKING_MOVE_ARROW and depth == DEPTH:  # Display the root move
+                if CHECKING_MOVE_ARROW and depth >= RENDER_DEPTH:  # Display the root move
                     self.display_checking_move_arrow(move)
 
                 old_material, old_mg, old_eg, old_npm = score.material, score.mg, score.eg, score.npm
@@ -225,7 +225,7 @@ class ChessBot:
             best_value = MAX_VALUE
             for move in legal_moves:
                 self.moves_checked += 1
-                if CHECKING_MOVE_ARROW and depth == DEPTH:  # Display the root move
+                if CHECKING_MOVE_ARROW and depth >= RENDER_DEPTH:  # Display the root move
                     self.display_checking_move_arrow(move)
 
                 old_material, old_mg, old_eg, old_npm = score.material, score.mg, score.eg, score.npm

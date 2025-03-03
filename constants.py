@@ -213,9 +213,11 @@ CENTER_SQUARES = {chess.D4, chess.D5, chess.E4, chess.E5}  # Chess already has t
 
 # Game settings
 IS_BOT = True  # Set to False for human vs bot, True for bot vs bot
-UPDATE_DELAY_MS = 0  # Delay between visual updates in milliseconds
+UPDATE_DELAY_MS = 30  # Delay between visual updates in milliseconds
 LAST_MOVE_ARROW = True  # Set to True to display last move arrow
-CHECKING_MOVE_ARROW = False  # Set to True to display checking move arrow
+CHECKING_MOVE_ARROW = False  # Set to True to display checking move arrow (switches the mode to svg rendering)
 
 # Search settings
 DEPTH = 5  # Search depth for the minimax algorithm
+RENDER_DEPTH = 5 # Depth to render checking moves (set to DEPTH to render root moves)
+RENDER_DEPTH = 0 # Depth to render checking moves (set to DEPTH to render root moves)
