@@ -1,24 +1,27 @@
 from board import ChessBoard
-import chess.polyglot # Zobrist hashing
+import chess.polyglot  # Zobrist hashing
 
-from enum import IntEnum # For flags
-from dataclasses import dataclass # For TT entries
+from dataclasses import dataclass  # For TT entries
+from typing_extensions import TypeAlias  # For flags
 from typing import Optional, TYPE_CHECKING
 if TYPE_CHECKING:
-    from game import ChessGame # Only import while type checking
+    from game import ChessGame  # Only import while type checking
 
-from lru import LRU # For TT and history tables 
+from lru import LRU  # For TT and history tables
 
-from constants import DEPTH, PIECE_VALUES_STOCKFISH, MAX_VALUE, MIN_VALUE, CHECKING_MOVE_ARROW
+from constants import DEPTH, MAX_VALUE, MIN_VALUE, CHECKING_MOVE_ARROW, \
+    PIECE_VALUES_STOCKFISH, FLIP, MIDGAME, ENDGAME, PSQT, NPM_SCALAR
 
-import colors # Debug log colors
-import timeit # Debug timing
+import colors  # Debug log colors
+import timeit  # Debug timing
 
-class Flag(IntEnum):
-    EXACT = 0
-    LOWERBOUND = 1
-    UPPERBOUND = 2
+# Transposition table entry flags
+Flag: TypeAlias = int
+EXACT: Flag = 1
+LOWERBOUND: Flag = 2
+UPPERBOUND: Flag = 3
 
+# Transposition table entry
 @dataclass
 class TTEntry:
     depth: int
@@ -31,11 +34,14 @@ class ChessBot:
         self.game: "ChessGame" = game
         self.moves_checked: int = 0
 
+        self.transposition_table = LRU(1_000_000)  # Transposition table
+        self.position_cache = LRU(1_000_000) # Position cache
+
     def display_checking_move_arrow(self, move):
         self.game.checking_move = move
         self.game.display_board(self.game.last_move)  # Update display
 
-    def evaluate_position(self, chess_board: chess.Board, key: Optional[int] = None, has_legal_moves = False) -> float:
+    def evaluate_position(self, chess_board: chess.Board, key: Optional[int] = None, has_legal_moves=False) -> float:
         """
         Evaluate the current position.
         Uses the evaluation cache if available.
@@ -43,52 +49,192 @@ class ChessBot:
         """
         # Check expensive operations once
         if not has_legal_moves:
-            has_legal_moves = bool(chess_board.legal_moves) # ! SLOW
+            has_legal_moves = bool(chess_board.legal_moves)  # ! SLOW
         is_check: bool = chess_board.is_check()
 
         # Evaluate game-ending conditions
-        if not has_legal_moves: # No legal moves
-            if is_check: # Checkmate
+        if not has_legal_moves:  # No legal moves
+            if is_check:  # Checkmate
                 return -10_000 if chess_board.turn else 10_000
-            return 0 # Stalemate
-        elif chess_board.is_insufficient_material(): # Insufficient material for either side to win
+            return 0  # Stalemate
+        elif chess_board.is_insufficient_material():  # Insufficient material for either side to win
             return 0
-        elif chess_board.can_claim_fifty_moves(): # Avoid fifty move rule
+        elif chess_board.can_claim_fifty_moves():  # Avoid fifty move rule
             return 0
+
+        # Get white and black bitboards
+        wp = chess_board.occupied_co[chess.WHITE]
+        bp = chess_board.occupied_co[chess.BLACK]
+
+        # Material evaluation
+        score, npm = self.evaluate_material(chess_board, wp, bp)
         
-        # Evaluate the position
-        score = self.evaluate_material(chess_board) # Material evaluation
-       
+        # Phase-based piece position evaluation
+        phase = npm // NPM_SCALAR # Game phase evaluation (0: endgame, 255: opening)
+        score += self.evaluate_piece_position(chess_board, wp, bp, phase)
+
         return score
 
-    def evaluate_material(self, chess_board: chess.Board):
+    def evaluate_material(self, chess_board: chess.Board, wp: chess.Bitboard, bp: chess.Bitboard) -> tuple[int, int]:
         """
         Basic piece counting with standard values.
         Additional bonuses for piece combinations.
         Can be extended with phase-dependent values.
-        """    
-        # Count all pieces at once with direct bitboard access (much more optimized than provided version)
-        wp = chess_board.occupied_co[chess.WHITE]
-        bp = chess_board.occupied_co[chess.BLACK]
-        
-        # Pawns, Knights, Rooks, Queens
-        score = (
-            PIECE_VALUES_STOCKFISH[chess.PAWN] * (chess.popcount(wp & chess_board.pawns) - chess.popcount(bp & chess_board.pawns)) + 
-            PIECE_VALUES_STOCKFISH[chess.KNIGHT] * (chess.popcount(wp & chess_board.knights) - chess.popcount(bp & chess_board.knights)) +
-            PIECE_VALUES_STOCKFISH[chess.ROOK] * (chess.popcount(wp & chess_board.rooks) - chess.popcount(bp & chess_board.rooks)) +
-            PIECE_VALUES_STOCKFISH[chess.QUEEN] * (chess.popcount(wp & chess_board.queens) - chess.popcount(bp & chess_board.queens))
-        )
+        """
+        white_pawn_count = (wp & chess_board.pawns).bit_count()
+        black_pawn_count = (bp & chess_board.pawns).bit_count()
+        white_knight_count = (wp & chess_board.knights).bit_count()
+        black_knight_count = (bp & chess_board.knights).bit_count()
+        white_bishop_count = (wp & chess_board.bishops).bit_count()
+        black_bishop_count = (bp & chess_board.bishops).bit_count()
+        white_rook_count = (wp & chess_board.rooks).bit_count()
+        black_rook_count = (bp & chess_board.rooks).bit_count()
+        white_queen_count = (wp & chess_board.queens).bit_count()
+        black_queen_count = (bp & chess_board.queens).bit_count()
 
-        # Bishops
-        white_bishop_count = chess.popcount(wp & chess_board.bishops)
-        black_bishop_count = chess.popcount( bp & chess_board.bishops)
-        score += PIECE_VALUES_STOCKFISH[chess.BISHOP] * (white_bishop_count - black_bishop_count)
-        
-        # Bishop pair bonus worth half a pawn
-        return score + ((white_bishop_count >= 2) - (black_bishop_count >= 2)) * (PIECE_VALUES_STOCKFISH[chess.PAWN] >> 1)
-        
-    # def evaluate_piece_position(self, chess_board: chess.Board):
+        score = PIECE_VALUES_STOCKFISH[chess.PAWN] * (white_pawn_count - black_pawn_count) + \
+            PIECE_VALUES_STOCKFISH[chess.KNIGHT] * (white_knight_count - black_knight_count) + \
+            PIECE_VALUES_STOCKFISH[chess.BISHOP] * (white_bishop_count - black_bishop_count) + \
+            PIECE_VALUES_STOCKFISH[chess.ROOK] * (white_rook_count - black_rook_count) + \
+            PIECE_VALUES_STOCKFISH[chess.QUEEN] * (white_queen_count - black_queen_count)
 
+        # Non-pawn material (NPM)
+        npm = PIECE_VALUES_STOCKFISH[chess.KNIGHT] * (white_knight_count + black_knight_count) + \
+            PIECE_VALUES_STOCKFISH[chess.BISHOP] * (white_bishop_count + black_bishop_count) + \
+            PIECE_VALUES_STOCKFISH[chess.ROOK] * (white_rook_count + black_rook_count) + \
+            PIECE_VALUES_STOCKFISH[chess.QUEEN] * (white_queen_count + black_queen_count)
+
+        # Return all socres (bishop pair bonus worth half a pawn)
+        return score + ((white_bishop_count >= 2) - (black_bishop_count >= 2)) * (PIECE_VALUES_STOCKFISH[chess.PAWN] >> 1), npm
+
+    def evaluate_piece_position(self, chess_board: chess.Board, wp: chess.Bitboard, bp: chess.Bitboard, phase):
+        """
+        Evaluates piece positions using PSQT tables with interpolation between middlegame and endgame.
+        Returns a score where positive values favor white and negative.
+        """
+        mg_score = 0
+        eg_score = 0
+        
+        # Cache these lookups to avoid repeated dictionary access
+        mg_pawn = PSQT[MIDGAME][chess.PAWN]
+        mg_knight = PSQT[MIDGAME][chess.KNIGHT]
+        mg_bishop = PSQT[MIDGAME][chess.BISHOP]
+        mg_rook = PSQT[MIDGAME][chess.ROOK]
+        mg_queen = PSQT[MIDGAME][chess.QUEEN]
+        mg_king = PSQT[MIDGAME][chess.KING]
+        
+        eg_pawn = PSQT[ENDGAME][chess.PAWN]
+        eg_knight = PSQT[ENDGAME][chess.KNIGHT]
+        eg_bishop = PSQT[ENDGAME][chess.BISHOP]
+        eg_rook = PSQT[ENDGAME][chess.ROOK]
+        eg_queen = PSQT[ENDGAME][chess.QUEEN]
+        eg_king = PSQT[ENDGAME][chess.KING]
+        
+        # White pawns
+        w_bb = wp & chess_board.pawns
+        while w_bb:
+            square = chess.lsb(w_bb)
+            flip_square = FLIP[square]
+            mg_score += mg_pawn[flip_square]
+            eg_score += eg_pawn[flip_square]
+            w_bb &= w_bb - 1
+        
+        # White knights
+        w_bb = wp & chess_board.knights
+        while w_bb:
+            square = chess.lsb(w_bb)
+            flip_square = FLIP[square]
+            mg_score += mg_knight[flip_square]
+            eg_score += eg_knight[flip_square]
+            w_bb &= w_bb - 1
+        
+        # White bishops
+        w_bb = wp & chess_board.bishops
+        while w_bb:
+            square = chess.lsb(w_bb)
+            flip_square = FLIP[square]
+            mg_score += mg_bishop[flip_square]
+            eg_score += eg_bishop[flip_square]
+            w_bb &= w_bb - 1
+        
+        # White rooks
+        w_bb = wp & chess_board.rooks
+        while w_bb:
+            square = chess.lsb(w_bb)
+            flip_square = FLIP[square]
+            mg_score += mg_rook[flip_square]
+            eg_score += eg_rook[flip_square]
+            w_bb &= w_bb - 1
+        
+        # White queens
+        w_bb = wp & chess_board.queens
+        while w_bb:
+            square = chess.lsb(w_bb)
+            flip_square = FLIP[square]
+            mg_score += mg_queen[flip_square]
+            eg_score += eg_queen[flip_square]
+            w_bb &= w_bb - 1
+        
+        # White king
+        w_bb = wp & chess_board.kings
+        if w_bb:
+            square = chess.lsb(w_bb)
+            flip_square = FLIP[square]
+            mg_score += mg_king[flip_square]
+            eg_score += eg_king[flip_square]
+        
+        # Black pawns
+        b_bb = bp & chess_board.pawns
+        while b_bb:
+            square = chess.lsb(b_bb)
+            mg_score -= mg_pawn[square]
+            eg_score -= eg_pawn[square]
+            b_bb &= b_bb - 1
+        
+        # Black knights
+        b_bb = bp & chess_board.knights
+        while b_bb:
+            square = chess.lsb(b_bb)
+            mg_score -= mg_knight[square]
+            eg_score -= eg_knight[square]
+            b_bb &= b_bb - 1
+        
+        # Black bishops
+        b_bb = bp & chess_board.bishops
+        while b_bb:
+            square = chess.lsb(b_bb)
+            mg_score -= mg_bishop[square]
+            eg_score -= eg_bishop[square]
+            b_bb &= b_bb - 1
+        
+        # Black rooks
+        b_bb = bp & chess_board.rooks
+        while b_bb:
+            square = chess.lsb(b_bb)
+            mg_score -= mg_rook[square]
+            eg_score -= eg_rook[square]
+            b_bb &= b_bb - 1
+        
+        # Black queens
+        b_bb = bp & chess_board.queens
+        while b_bb:
+            square = chess.lsb(b_bb)
+            mg_score -= mg_queen[square]
+            eg_score -= eg_queen[square]
+            b_bb &= b_bb - 1
+        
+        # Black king
+        b_bb = bp & chess_board.kings
+        if b_bb:
+            square = chess.lsb(b_bb)
+            mg_score -= mg_king[square]
+            eg_score -= eg_king[square]
+
+        # Inline interpolate function to save a function call
+        return ((mg_score * phase) + (eg_score * (256 - phase))) // 256
+
+
+    # def quiescence(self, chess_board: chess.Board, alpha, beta, depth):
 
     def alpha_beta(self, chess_board: chess.Board, depth: int, alpha, beta, maximizing_player: bool):
         # Terminal node check
@@ -97,13 +243,13 @@ class ChessBot:
         legal_moves = list(chess_board.legal_moves)
         if not legal_moves:
             return self.evaluate_position(chess_board, has_legal_moves=False), None
-        
+
         best_move = None
         if maximizing_player:
             best_value = MIN_VALUE
             for move in legal_moves:
                 self.moves_checked += 1
-                if CHECKING_MOVE_ARROW and depth == DEPTH: # Display the root move
+                if CHECKING_MOVE_ARROW and depth == DEPTH:  # Display the root move
                     self.display_checking_move_arrow(move)
 
                 chess_board.push(move)
@@ -115,13 +261,13 @@ class ChessBot:
                     best_move = move
                 alpha = max(alpha, value)
                 if value >= beta:
-                    break # Beta cutoff
+                    break  # Beta cutoff
 
-        else: # Minimizing player
+        else:  # Minimizing player
             best_value = MAX_VALUE
             for move in legal_moves:
                 self.moves_checked += 1
-                if CHECKING_MOVE_ARROW and depth == DEPTH: # Display the root move
+                if CHECKING_MOVE_ARROW and depth == DEPTH:  # Display the root move
                     self.display_checking_move_arrow(move)
 
                 chess_board.push(move)
@@ -132,10 +278,9 @@ class ChessBot:
                     best_move = move
                 beta = min(beta, value)
                 if value <= alpha:
-                    break # Alpha cutoff
+                    break  # Alpha cutoff
 
         return best_value, best_move
-
 
     # TODO ---------------------------------------------
     # def next_guess(self, alpha, beta, subtree_count):
@@ -143,27 +288,27 @@ class ChessBot:
 
     # def best_node_search(self, chess_board: chess.Board, alpha, beta, maximizing_player: bool):
     #     return 0
-    
-    
+
     def get_move(self, board: ChessBoard):
         """
         Main method to get the best move for the current player.
-        """        
+        """
         chess_board = board.get_board_state()
-    
+
         self.moves_checked = 0
 
         # Run minimax once with manual timing
         start_time = timeit.default_timer()
-        best_value, best_move = self.alpha_beta(chess_board, DEPTH, MIN_VALUE, MAX_VALUE, chess_board.turn)
+        best_value, best_move = self.alpha_beta(
+            chess_board, DEPTH, MIN_VALUE, MAX_VALUE, chess_board.turn)
         time_taken = timeit.default_timer() - start_time
 
         # TODO move print stuff into function
         # Moves checked over time taken
         time_per_move = time_taken / self.moves_checked if self.moves_checked > 0 else 0
         print(f"Moves/Time: {colors.BOLD}{colors.get_moves_color(self.moves_checked)}{self.moves_checked:,}{colors.RESET} / "
-            f"{colors.BOLD}{colors.get_move_time_color(time_taken)}{time_taken:.2f}{colors.RESET} s = "
-            f"{colors.BOLD}{colors.CYAN}{time_per_move * 1000:.4f}{colors.RESET} ms/M")
+              f"{colors.BOLD}{colors.get_move_time_color(time_taken)}{time_taken:.2f}{colors.RESET} s = "
+              f"{colors.BOLD}{colors.CYAN}{time_per_move * 1000:.4f}{colors.RESET} ms/M")
 
         # # Calculate memory usage more accurately
         # tt_entry_size = sys.getsizeof(TranspositionEntry(0, 0.0, "", None))

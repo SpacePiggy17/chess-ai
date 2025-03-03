@@ -230,10 +230,7 @@ class ChessBot:
         return score
 
     def get_game_phase(chess_board: chess.Board):
-        """
-        Returns a value between 0 (endgame) and 256 (opening)
-        based on remaining material
-        """
+        """Returns a value between 0 (endgame) and 256 (opening) based on remaining material."""
         npm = 0  # Non-pawn material
         for piece_type in [chess.KNIGHT, chess.BISHOP, chess.ROOK, chess.QUEEN]:
             npm += len(chess_board.pieces(piece_type, True)) * PIECE_VALUES_STOCKFISH[piece_type]
@@ -242,10 +239,7 @@ class ChessBot:
         return min(npm, 256)
 
     def interpolate(mg_score, eg_score, phase):
-        """
-        Interpolate between middlegame and endgame scores
-        based on game phase
-        """
+        """Interpolate between middlegame and endgame scores based on game phase."""
         return ((mg_score * phase) + (eg_score * (256 - phase))) // 256
 
     def get_sorted_moves(self, chess_board: chess.Board) -> list:
