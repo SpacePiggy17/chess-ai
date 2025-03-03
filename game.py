@@ -13,7 +13,6 @@ from constants import IS_BOT, UPDATE_DELAY_MS, LAST_MOVE_ARROW, CHECKING_MOVE_AR
 class ChessGame:
     def __init__(self):
         self.board = ChessBoard()
-        self.update_delay = UPDATE_DELAY_MS  # Millisecond delay between visual updates 
 
         self.checking_move = None # Currently checked move
         self.last_move = None     # Last move played
@@ -49,7 +48,7 @@ class ChessGame:
         current_time = pygame.time.get_ticks()
         # Skip update if too soon (unless forced)
         if not force_update and hasattr(self, 'last_update_time'):
-            if current_time - self.last_update_time < self.update_delay:
+            if current_time - self.last_update_time < UPDATE_DELAY_MS:
                 return
 
         # Build highlight dictionary for the selected square

@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 from lru import LRU  # For TT and history tables
 
 from constants import DEPTH, MAX_VALUE, MIN_VALUE, CHECKING_MOVE_ARROW, \
-    PIECE_VALUES_STOCKFISH, FLIP, MIDGAME, ENDGAME, PSQT, NPM_SCALAR
+    PIECE_VALUES_STOCKFISH, FLIP, MIDGAME, ENDGAME, PSQT, START_NPM, NPM_SCALAR
 
 import colors  # Debug log colors
 import timeit  # Debug timing
@@ -30,16 +30,96 @@ class TTEntry:
     best_move: Optional[chess.Move]
 
 class ChessBot:
+
     def __init__(self, game):
         self.game: "ChessGame" = game
         self.moves_checked: int = 0
 
         self.transposition_table = LRU(1_000_000)  # Transposition table
-        self.position_cache = LRU(1_000_000) # Position cache
+
+        self.material_score: int = 0 # Material score
+        self.mg_score: int = 0 # Midgame score
+        self.eg_score: int = 0 # Endgame score
+        self.npm_score: int = 0 # Non-pawn material score
+
+        self.initialize_scores() # Initialize scores
+
+    @staticmethod
+    def get_phase(npm_score: int) -> int:
+        """Returns a value between 0 (endgame) and 256 (opening) based on remaining material."""
+        return npm_score // NPM_SCALAR
+    
+    @staticmethod
+    def interpolate(mg_score, eg_score, phase: int) -> int:
+        """Interpolates between midgame and endgame scores based on phase."""
+        return ((mg_score * phase) + (eg_score * (256 - phase))) // 256
+
+    def initialize_scores(self):
+        """
+        Initialize values for starting position.
+        Calculates material score, npm score, and evaluates piece positions.
+        Evaluates piece positions using PSQT with interpolation between middlegame and endgame.
+        Runs only once so not optimized for clarity.
+        """
+        chess_board = self.game.board.get_board_state()
+
+        white_bishop_count = 0
+        black_bishop_count = 0
+
+        # Evaluate each piece type
+        for piece_type in chess.PIECE_TYPES:
+            # White pieces (flip square indices since tables are oriented for black)
+            for square in chess_board.pieces(piece_type, chess.WHITE):
+                # Update material score
+                self.material_score += PIECE_VALUES_STOCKFISH[piece_type]
+
+                # Update npm score
+                if piece_type != chess.PAWN and piece_type != chess.KING:
+                    self.npm_score += PIECE_VALUES_STOCKFISH[piece_type]
+
+                    # Update bishop count for bishop pair bonus
+                    if piece_type == chess.BISHOP:
+                        white_bishop_count += 1
+
+                # Update piece position scores
+                flipped_square = FLIP[square]
+                self.mg_score += PSQT[MIDGAME][piece_type][flipped_square]
+                self.eg_score += PSQT[ENDGAME][piece_type][flipped_square]
+            
+            # Black pieces (use square indices directly)
+            for square in chess_board.pieces(piece_type, chess.BLACK):
+                # Update material score
+                self.material_score -= PIECE_VALUES_STOCKFISH[piece_type]
+
+                # Update npm score
+                if piece_type != chess.PAWN and piece_type != chess.KING:
+                    self.npm_score += PIECE_VALUES_STOCKFISH[piece_type]
+
+                    # Update bishop count for bishop pair bonus
+                    if piece_type == chess.BISHOP:
+                        black_bishop_count += 1
+                
+                # Update piece position scores
+                self.mg_score -= PSQT[MIDGAME][piece_type][square]
+                self.eg_score -= PSQT[ENDGAME][piece_type][square]
+        
+        # Bishop pair bonus worth half a pawn
+        if white_bishop_count >= 2:
+            self.material_score += PIECE_VALUES_STOCKFISH[chess.PAWN] >> 1
+        if black_bishop_count >= 2:
+            self.material_score -= PIECE_VALUES_STOCKFISH[chess.PAWN] >> 1
+
+        # Interpolate between middlegame and endgame scores based on phase
+        phase = self.get_phase(self.npm_score)
+        self.position_score = self.interpolate(self.mg_score, self.eg_score, phase)
+        
 
     def display_checking_move_arrow(self, move):
         self.game.checking_move = move
         self.game.display_board(self.game.last_move)  # Update display
+
+    def update_scores_for_moves(self, board: chess.Board, move: chess.Move):
+
 
     def evaluate_position(self, chess_board: chess.Board, key: Optional[int] = None, has_legal_moves=False) -> float:
         """
@@ -62,20 +142,21 @@ class ChessBot:
         elif chess_board.can_claim_fifty_moves():  # Avoid fifty move rule
             return 0
 
-        # Get white and black bitboards
-        wp = chess_board.occupied_co[chess.WHITE]
-        bp = chess_board.occupied_co[chess.BLACK]
+        # # Get white and black bitboards
+        # wp = chess_board.occupied_co[chess.WHITE]
+        # bp = chess_board.occupied_co[chess.BLACK]
 
-        # Material evaluation
-        score, npm = self.evaluate_material(chess_board, wp, bp)
+        # # Material evaluation
+        # score, npm = self.evaluate_material(chess_board, wp, bp)
         
-        # Phase-based piece position evaluation
-        phase = npm // NPM_SCALAR # Game phase evaluation (0: endgame, 255: opening)
-        score += self.evaluate_piece_position(chess_board, wp, bp, phase)
+        # # Phase-based piece position evaluation
+        # score += self.evaluate_piece_position(chess_board, wp, bp, phase)
 
-        return score
+        # Return the score (material + position)
+        phase = self.get_phase(self.npm_score)
+        return self.material_score + self.interpolate(self.mg_score, self.eg_score, phase)
 
-    def evaluate_material(self, chess_board: chess.Board, wp: chess.Bitboard, bp: chess.Bitboard) -> tuple[int, int]:
+    # def evaluate_material(self, chess_board: chess.Board, wp: chess.Bitboard, bp: chess.Bitboard) -> tuple[int, int]:
         """
         Basic piece counting with standard values.
         Additional bonuses for piece combinations.
@@ -107,7 +188,7 @@ class ChessBot:
         # Return all socres (bishop pair bonus worth half a pawn)
         return score + ((white_bishop_count >= 2) - (black_bishop_count >= 2)) * (PIECE_VALUES_STOCKFISH[chess.PAWN] >> 1), npm
 
-    def evaluate_piece_position(self, chess_board: chess.Board, wp: chess.Bitboard, bp: chess.Bitboard, phase):
+    # def evaluate_piece_position(self, chess_board: chess.Board, wp: chess.Bitboard, bp: chess.Bitboard, phase):
         """
         Evaluates piece positions using PSQT tables with interpolation between middlegame and endgame.
         Returns a score where positive values favor white and negative.
@@ -231,8 +312,7 @@ class ChessBot:
             eg_score -= eg_king[square]
 
         # Inline interpolate function to save a function call
-        return ((mg_score * phase) + (eg_score * (256 - phase))) // 256
-
+        return
 
     # def quiescence(self, chess_board: chess.Board, alpha, beta, depth):
 
