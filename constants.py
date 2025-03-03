@@ -3,11 +3,11 @@ import numpy as np  # For piece square tables
 from typing_extensions import TypeAlias  # For GameStage
 
 # Set to None for standard starting position, or FEN string for custom starting position
-STARTING_FEN = None
-# STARTING_FEN = "rnb2knr/ppp2ppp/8/4P2Q/2p1P3/2N5/PPP2PPP/2KR2NR b - - 1 10"
+STARTING_FEN: str = None
+# STARTING_FEN: str = "rnb2knr/ppp2ppp/8/4P2Q/2p1P3/2N5/PPP2PPP/2KR2NR b - - 1 10"
 
 # Board and piece settings
-PIECE_VALUES = {
+PIECE_VALUES: dict[int, int] = {
     chess.PAWN: 100,
     chess.KNIGHT: 320,
     chess.BISHOP: 330,
@@ -15,7 +15,7 @@ PIECE_VALUES = {
     chess.QUEEN: 900,
     chess.KING: 20000
 }
-PIECE_VALUES_STOCKFISH = {
+PIECE_VALUES_STOCKFISH: dict[int, int] = {
     chess.PAWN: 208,
     chess.KNIGHT: 781,
     chess.BISHOP: 825,
@@ -25,12 +25,12 @@ PIECE_VALUES_STOCKFISH = {
 }
 
 # Total npm at start (16604 with stockfish values)
-START_NPM = PIECE_VALUES_STOCKFISH[chess.KNIGHT] * 4 + \
+START_NPM: np.int16 = PIECE_VALUES_STOCKFISH[chess.KNIGHT] * 4 + \
     PIECE_VALUES_STOCKFISH[chess.BISHOP] * 4 + \
     PIECE_VALUES_STOCKFISH[chess.ROOK] * 4 + \
     PIECE_VALUES_STOCKFISH[chess.QUEEN] * 2
 # NPM scalar for evaluation (65 with stockfish values)
-NPM_SCALAR = (START_NPM // 256) + 1
+NPM_SCALAR: np.int8 = (START_NPM // 256) + 1
 
 # Game stages
 GameStage: TypeAlias = np.int8
@@ -184,7 +184,7 @@ FLIP = np.array([
 ])
 
 # Piece square tables for black (flip for white with PSQT[game_stage][piece_type][FLIP[square]])
-PSQT = [
+PSQT: list[dict[chess.PieceType, np.ndarray]] = [
     {
         chess.PAWN: mg_pawn_table,
         chess.KNIGHT: mg_knight_table,
@@ -203,19 +203,29 @@ PSQT = [
     }
 ]
 
-MAX_VALUE = float('inf')
-MIN_VALUE = float('-inf')
+# Use a dict for faster lookup of castling updates
+CASTLING_UPDATES: dict[tuple[int, int], tuple[int, int, bool]] = {
+    # (from_square, to_square, color): (rook_from, rook_to)
+    (chess.E1, chess.G1, chess.WHITE): (chess.H1, chess.F1), # White kingside
+    (chess.E1, chess.C1, chess.WHITE): (chess.A1, chess.D1), # White queenside
+    (chess.E8, chess.G8, chess.BLACK): (chess.H8, chess.F8), # Black kingside
+    (chess.E8, chess.C8, chess.BLACK): (chess.A8, chess.D8), # Black queenside
+}
 
-# MAX_VALUE = 32_001
-# MIN_VALUE = -MAX_VALUE
+# MAX_VALUE: float = float('inf')
+# MIN_VALUE: float = float('-inf')
 
-CENTER_SQUARES = {chess.D4, chess.D5, chess.E4, chess.E5}  # Chess already has this built in
+MAX_VALUE: np.int16 = 32767 # 2**(16-1) - 1 (max value for 16 bit integer)
+MIN_VALUE: np.int16 = -32768 # -2**(16-1) (min value for 16 bit integer)
+# CENTER_SQUARES = {chess.D4, chess.D5, chess.E4, chess.E5}  # Chess already has this built in
 
 # Game settings
-IS_BOT = True  # Set to False for human vs bot, True for bot vs bot
-UPDATE_DELAY_MS = 30  # Delay between visual updates in milliseconds
-LAST_MOVE_ARROW = True  # Set to True to display last move arrow
-CHECKING_MOVE_ARROW = False  # Set to True to display checking move arrow (switches the mode to svg rendering)
+IS_BOT: bool = True  # Set to False for human vs bot, True for bot vs bot
+UPDATE_DELAY_MS: np.int8 = 30  # Delay between visual updates in milliseconds
+LAST_MOVE_ARROW: bool = True  # Set to True to display last move arrow
+CHECKING_MOVE_ARROW: bool = False  # Set to True to display checking move arrow (switches the mode to svg rendering)
+BREAK_TURN: np.int8 = 2 # Number of turns to break after (for debugging)
+TT_SIZE: np.int8 = 64 # Size of the transposition table (in MB)
 
 # Search settings
 DEPTH = 5  # Search depth for the minimax algorithm

@@ -9,14 +9,17 @@ import io
 from PIL import Image
 import math # For fast render arrows
 
-from constants import IS_BOT, UPDATE_DELAY_MS, LAST_MOVE_ARROW, CHECKING_MOVE_ARROW
+from constants import IS_BOT, UPDATE_DELAY_MS, LAST_MOVE_ARROW, CHECKING_MOVE_ARROW, BREAK_TURN
 
 class ChessGame:
+    __slots__ = ['board', 'checking_move', 'last_move', 'last_update_time', 'white_player', 'black_player', 'piece_images', 'square_colors', 'highlighted_square_color', 'WINDOW_SIZE', 'screen', 'empty_board_surface', 'last_board_state']
+    
     def __init__(self):
         self.board = ChessBoard()
 
         self.checking_move = None # Current move to check
         self.last_move = None # Last move played
+        self.last_update_time: int = pygame.time.get_ticks()
         
         # Initialize players based on IS_BOT flag
         if IS_BOT:
@@ -294,7 +297,11 @@ class ChessGame:
                 print(f"Eval: {self.black_player.evaluate_position(self.board.get_board_state(), self.black_player.score)}")
             # print(f"Move played: {move}")
             print("-------------------")
-            self.last_move = move            
+            self.last_move = move
+
+            if self.board.get_board_state().fullmove_number > BREAK_TURN:
+                pygame.quit()
+                return
             
         # Display final position
         self.display_board(self.last_move, force_update=True)
@@ -310,7 +317,7 @@ class ChessGame:
         # 
         # pygame.quit()
 
-        while True:
+        while 1:
             # Process all pending events at once rather than waiting
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:

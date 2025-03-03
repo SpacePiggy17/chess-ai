@@ -53,3 +53,4 @@ class ChessBoard:
         if self.is_game_over():
             return self.board.outcome()
         return None
+
