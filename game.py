@@ -106,7 +106,7 @@ class ChessGame:
             current_player = self.white_player if self.board.get_board_state().turn else self.black_player
             
             # Get player's move
-            move = current_player.get_move(self.board)
+            move = current_player.get_move(self.board.get_board_state())
             
             if move is None:
                 print("Game ended by player")
@@ -117,7 +117,11 @@ class ChessGame:
                 print(f"Illegal move attempted: {move}")
                 break
                 
-            print(f"Eval: {self.black_player.evaluate_position(self.board.get_board_state())}")
+            # TODO Create generic evaluation function
+            if current_player == self.white_player and type(self.white_player) == ChessBot:
+                print(f"Eval: {self.white_player.evaluate_position(self.board.get_board_state(), self.white_player.score)}")
+            else:
+                print(f"Eval: {self.black_player.evaluate_position(self.board.get_board_state(), self.black_player.score)}")
             # print(f"Move played: {move}")
             print("-------------------")
             self.last_move = move            

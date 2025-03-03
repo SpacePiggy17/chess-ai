@@ -15,6 +15,7 @@ from constants import DEPTH, MAX_VALUE, MIN_VALUE, CHECKING_MOVE_ARROW, \
 import colors  # Debug log colors
 import timeit  # Debug timing
 
+
 # Transposition table entry flags
 Flag: TypeAlias = int
 EXACT: Flag = 1
@@ -29,107 +30,148 @@ class TTEntry:
     flag: Flag
     best_move: Optional[chess.Move]
 
-class ChessBot:
+# Score class to store scores and update them
+@dataclass
+class Score: # Positive values favor white, negative values favor black
+    material: int # Material score
+    mg: int # Midgame score
+    eg: int # Endgame score
+    npm: int # Non-pawn material (for phase calculation)
 
-    def __init__(self, game):
-        self.game: "ChessGame" = game
-        self.moves_checked: int = 0
+    def update(self, chess_board: chess.Board, move: chess.Move):
+        """
+        Updates the material, midgame, endgame, and non-pawn material scores based on the move.
+        """
+        from_square = move.from_square
+        to_square = move.to_square
+        promotion = move.promotion
 
-        self.transposition_table = LRU(1_000_000)  # Transposition table
+        piece = chess_board.piece_at(from_square)
+        captured_piece = chess_board.piece_at(to_square)
 
-        self.material_score: int = 0 # Material score
-        self.mg_score: int = 0 # Midgame score
-        self.eg_score: int = 0 # Endgame score
-        self.npm_score: int = 0 # Non-pawn material score
+        is_en_passant = chess_board.is_en_passant(move)
 
-        self.initialize_scores() # Initialize scores
+        if piece.piece_type == chess.KING:
+            # Update rook scores for castling
+            if from_square == chess.E1: # White king
+                if to_square == chess.G1: # White kingside castle
+                    self.mg += PSQT[MIDGAME][chess.ROOK][FLIP[chess.F1]] - PSQT[MIDGAME][chess.ROOK][FLIP[chess.H1]]
+                    self.eg += PSQT[ENDGAME][chess.ROOK][FLIP[chess.F1]] - PSQT[ENDGAME][chess.ROOK][FLIP[chess.H1]]
+                elif to_square == chess.C1: # White queenside castle
+                    self.mg += PSQT[MIDGAME][chess.ROOK][FLIP[chess.D1]] - PSQT[MIDGAME][chess.ROOK][FLIP[chess.A1]]
+                    self.eg += PSQT[ENDGAME][chess.ROOK][FLIP[chess.D1]] - PSQT[ENDGAME][chess.ROOK][FLIP[chess.A1]]
+            elif from_square == chess.E8: # Black king
+                if to_square == chess.G8: # Black kingside castle
+                    self.mg -= PSQT[MIDGAME][chess.ROOK][chess.F8] - PSQT[MIDGAME][chess.ROOK][chess.H8]
+                    self.eg -= PSQT[ENDGAME][chess.ROOK][chess.F8] - PSQT[ENDGAME][chess.ROOK][chess.H8]
+                elif to_square == chess.C8: # Black queenside castle
+                    self.mg -= PSQT[MIDGAME][chess.ROOK][chess.D8] - PSQT[MIDGAME][chess.ROOK][chess.A8]
+                    self.eg -= PSQT[ENDGAME][chess.ROOK][chess.D8] - PSQT[ENDGAME][chess.ROOK][chess.A8]
 
-    @staticmethod
-    def get_phase(npm_score: int) -> int:
-        """Returns a value between 0 (endgame) and 256 (opening) based on remaining material."""
-        return npm_score // NPM_SCALAR
-    
-    @staticmethod
-    def interpolate(mg_score, eg_score, phase: int) -> int:
-        """Interpolates between midgame and endgame scores based on phase."""
-        return ((mg_score * phase) + (eg_score * (256 - phase))) // 256
+        # Update position scores for moving piece
+        if promotion: # Promotion
+            self.npm += PIECE_VALUES_STOCKFISH[promotion]
+            if piece.color: # White promotion
+                material += PIECE_VALUES_STOCKFISH[promotion] - PIECE_VALUES_STOCKFISH[chess.PAWN]
+                self.mg += PSQT[MIDGAME][promotion][FLIP[to_square]] - PSQT[MIDGAME][chess.PAWN][FLIP[from_square]]
+                self.eg += PSQT[ENDGAME][promotion][FLIP[to_square]] - PSQT[ENDGAME][chess.PAWN][FLIP[from_square]]
+            else: # Black promotion
+                material -= PIECE_VALUES_STOCKFISH[promotion] - PIECE_VALUES_STOCKFISH[chess.PAWN]
+                self.mg -= PSQT[MIDGAME][promotion][to_square] - PSQT[MIDGAME][chess.PAWN][from_square]
+                self.eg -= PSQT[ENDGAME][promotion][to_square] - PSQT[ENDGAME][chess.PAWN][from_square]
+        else: # Normal move
+            if piece.color: # White move
+                self.mg += PSQT[MIDGAME][piece.piece_type][FLIP[to_square]] - PSQT[MIDGAME][piece.piece_type][FLIP[from_square]]
+                self.eg += PSQT[ENDGAME][piece.piece_type][FLIP[to_square]] - PSQT[ENDGAME][piece.piece_type][FLIP[from_square]]
+            else: # Black move
+                self.mg -= PSQT[MIDGAME][piece.piece_type][to_square] - PSQT[MIDGAME][piece.piece_type][from_square]
+                self.eg -= PSQT[ENDGAME][piece.piece_type][to_square] - PSQT[ENDGAME][piece.piece_type][from_square]
 
-    def initialize_scores(self):
+        if captured_piece: # Capture
+            if is_en_passant: # Get the captured pawn from en passant
+                # Update captured piece and square
+                to_square += 8 if piece.color else -8
+                captured_piece = chess_board.piece_at(to_square)
+
+            if captured_piece.color: # White piece captured
+                self.material -= PIECE_VALUES_STOCKFISH[captured_piece.piece_type]
+                self.mg -= PSQT[MIDGAME][captured_piece.piece_type][FLIP[to_square]]
+                self.eg -= PSQT[ENDGAME][captured_piece.piece_type][FLIP[to_square]]
+            else: # Black piece captured
+                self.material += PIECE_VALUES_STOCKFISH[captured_piece.piece_type]
+                self.mg += PSQT[MIDGAME][captured_piece.piece_type][to_square]
+                self.eg += PSQT[ENDGAME][captured_piece.piece_type][to_square]
+
+            # Update npm score
+            if captured_piece.piece_type != chess.PAWN:
+                self.npm -= PIECE_VALUES_STOCKFISH[captured_piece.piece_type]
+
+    def initialize_scores(self, chess_board: chess.Board):
         """
         Initialize values for starting position.
         Calculates material score, npm score, and evaluates piece positions.
         Evaluates piece positions using PSQT with interpolation between middlegame and endgame.
         Runs only once so not optimized for clarity.
         """
-        chess_board = self.game.board.get_board_state()
-
         white_bishop_count = 0
         black_bishop_count = 0
 
         # Evaluate each piece type
-        for piece_type in chess.PIECE_TYPES:
-            # White pieces (flip square indices since tables are oriented for black)
-            for square in chess_board.pieces(piece_type, chess.WHITE):
-                # Update material score
-                self.material_score += PIECE_VALUES_STOCKFISH[piece_type]
-
+        for square in chess.SQUARES:
+            piece = chess_board.piece_at(square)
+            if piece:
                 # Update npm score
-                if piece_type != chess.PAWN and piece_type != chess.KING:
-                    self.npm_score += PIECE_VALUES_STOCKFISH[piece_type]
+                if piece.piece_type != chess.PAWN and piece.piece_type != chess.KING:
+                    self.npm += PIECE_VALUES_STOCKFISH[piece.piece_type]
 
-                    # Update bishop count for bishop pair bonus
-                    if piece_type == chess.BISHOP:
+                # Update material and position scores
+                if piece.color: # White piece
+                    self.material += PIECE_VALUES_STOCKFISH[piece.piece_type]
+                    self.mg += PSQT[MIDGAME][piece.piece_type][FLIP[square]]
+                    self.eg += PSQT[ENDGAME][piece.piece_type][FLIP[square]]
+                    if piece.piece_type == chess.BISHOP:
                         white_bishop_count += 1
-
-                # Update piece position scores
-                flipped_square = FLIP[square]
-                self.mg_score += PSQT[MIDGAME][piece_type][flipped_square]
-                self.eg_score += PSQT[ENDGAME][piece_type][flipped_square]
-            
-            # Black pieces (use square indices directly)
-            for square in chess_board.pieces(piece_type, chess.BLACK):
-                # Update material score
-                self.material_score -= PIECE_VALUES_STOCKFISH[piece_type]
-
-                # Update npm score
-                if piece_type != chess.PAWN and piece_type != chess.KING:
-                    self.npm_score += PIECE_VALUES_STOCKFISH[piece_type]
-
-                    # Update bishop count for bishop pair bonus
-                    if piece_type == chess.BISHOP:
+                else: # Black piece
+                    self.material -= PIECE_VALUES_STOCKFISH[piece.piece_type]
+                    self.mg -= PSQT[MIDGAME][piece.piece_type][square]
+                    self.eg -= PSQT[ENDGAME][piece.piece_type][square]
+                    if piece.piece_type == chess.BISHOP:
                         black_bishop_count += 1
-                
-                # Update piece position scores
-                self.mg_score -= PSQT[MIDGAME][piece_type][square]
-                self.eg_score -= PSQT[ENDGAME][piece_type][square]
-        
+
         # Bishop pair bonus worth half a pawn
         if white_bishop_count >= 2:
-            self.material_score += PIECE_VALUES_STOCKFISH[chess.PAWN] >> 1
+            self.material += PIECE_VALUES_STOCKFISH[chess.PAWN] >> 1
         if black_bishop_count >= 2:
-            self.material_score -= PIECE_VALUES_STOCKFISH[chess.PAWN] >> 1
+            self.material -= PIECE_VALUES_STOCKFISH[chess.PAWN] >> 1
 
-        # Interpolate between middlegame and endgame scores based on phase
-        phase = self.get_phase(self.npm_score)
-        self.position_score = self.interpolate(self.mg_score, self.eg_score, phase)
-        
+    def get_interpolated_score(self) -> int:
+        """Interpolates between midgame and endgame scores based on phase."""
+        phase = self.npm // NPM_SCALAR # Phase value between 0 and 256 (0 = endgame, 256 = opening)
+        return ((self.mg * phase) + (self.eg * (256 - phase))) // 256
+
+class ChessBot:
+    def __init__(self, game):
+        self.game: "ChessGame" = game
+        self.moves_checked: int = 0
+
+        self.score = Score(0, 0, 0, 0)  # Score object to store material, mg, eg, and npm scores
+        self.score.initialize_scores(self.game.board.get_board_state()) # Initialize scores once and update from there
+
+        # self.transposition_table = LRU(1_000_000)  # Transposition table
 
     def display_checking_move_arrow(self, move):
+        """Display an arrow on the board for the move being checked."""
         self.game.checking_move = move
         self.game.display_board(self.game.last_move)  # Update display
 
-    def update_scores_for_moves(self, board: chess.Board, move: chess.Move):
-
-
-    def evaluate_position(self, chess_board: chess.Board, key: Optional[int] = None, has_legal_moves=False) -> float:
+    def evaluate_position(self, chess_board: chess.Board, score: Score, key: Optional[int] = None, has_legal_moves=True) -> float:
         """
         Evaluate the current position.
-        Uses the evaluation cache if available.
         Positive values favor white, negative values favor black.
         """
         # Check expensive operations once
-        if not has_legal_moves:
-            has_legal_moves = bool(chess_board.legal_moves)  # ! SLOW
+        if has_legal_moves:
+            has_legal_moves = any(chess_board.legal_moves) # ! SLOW
         is_check: bool = chess_board.is_check()
 
         # Evaluate game-ending conditions
@@ -142,187 +184,18 @@ class ChessBot:
         elif chess_board.can_claim_fifty_moves():  # Avoid fifty move rule
             return 0
 
-        # # Get white and black bitboards
-        # wp = chess_board.occupied_co[chess.WHITE]
-        # bp = chess_board.occupied_co[chess.BLACK]
-
-        # # Material evaluation
-        # score, npm = self.evaluate_material(chess_board, wp, bp)
-        
-        # # Phase-based piece position evaluation
-        # score += self.evaluate_piece_position(chess_board, wp, bp, phase)
-
-        # Return the score (material + position)
-        phase = self.get_phase(self.npm_score)
-        return self.material_score + self.interpolate(self.mg_score, self.eg_score, phase)
-
-    # def evaluate_material(self, chess_board: chess.Board, wp: chess.Bitboard, bp: chess.Bitboard) -> tuple[int, int]:
-        """
-        Basic piece counting with standard values.
-        Additional bonuses for piece combinations.
-        Can be extended with phase-dependent values.
-        """
-        white_pawn_count = (wp & chess_board.pawns).bit_count()
-        black_pawn_count = (bp & chess_board.pawns).bit_count()
-        white_knight_count = (wp & chess_board.knights).bit_count()
-        black_knight_count = (bp & chess_board.knights).bit_count()
-        white_bishop_count = (wp & chess_board.bishops).bit_count()
-        black_bishop_count = (bp & chess_board.bishops).bit_count()
-        white_rook_count = (wp & chess_board.rooks).bit_count()
-        black_rook_count = (bp & chess_board.rooks).bit_count()
-        white_queen_count = (wp & chess_board.queens).bit_count()
-        black_queen_count = (bp & chess_board.queens).bit_count()
-
-        score = PIECE_VALUES_STOCKFISH[chess.PAWN] * (white_pawn_count - black_pawn_count) + \
-            PIECE_VALUES_STOCKFISH[chess.KNIGHT] * (white_knight_count - black_knight_count) + \
-            PIECE_VALUES_STOCKFISH[chess.BISHOP] * (white_bishop_count - black_bishop_count) + \
-            PIECE_VALUES_STOCKFISH[chess.ROOK] * (white_rook_count - black_rook_count) + \
-            PIECE_VALUES_STOCKFISH[chess.QUEEN] * (white_queen_count - black_queen_count)
-
-        # Non-pawn material (NPM)
-        npm = PIECE_VALUES_STOCKFISH[chess.KNIGHT] * (white_knight_count + black_knight_count) + \
-            PIECE_VALUES_STOCKFISH[chess.BISHOP] * (white_bishop_count + black_bishop_count) + \
-            PIECE_VALUES_STOCKFISH[chess.ROOK] * (white_rook_count + black_rook_count) + \
-            PIECE_VALUES_STOCKFISH[chess.QUEEN] * (white_queen_count + black_queen_count)
-
-        # Return all socres (bishop pair bonus worth half a pawn)
-        return score + ((white_bishop_count >= 2) - (black_bishop_count >= 2)) * (PIECE_VALUES_STOCKFISH[chess.PAWN] >> 1), npm
-
-    # def evaluate_piece_position(self, chess_board: chess.Board, wp: chess.Bitboard, bp: chess.Bitboard, phase):
-        """
-        Evaluates piece positions using PSQT tables with interpolation between middlegame and endgame.
-        Returns a score where positive values favor white and negative.
-        """
-        mg_score = 0
-        eg_score = 0
-        
-        # Cache these lookups to avoid repeated dictionary access
-        mg_pawn = PSQT[MIDGAME][chess.PAWN]
-        mg_knight = PSQT[MIDGAME][chess.KNIGHT]
-        mg_bishop = PSQT[MIDGAME][chess.BISHOP]
-        mg_rook = PSQT[MIDGAME][chess.ROOK]
-        mg_queen = PSQT[MIDGAME][chess.QUEEN]
-        mg_king = PSQT[MIDGAME][chess.KING]
-        
-        eg_pawn = PSQT[ENDGAME][chess.PAWN]
-        eg_knight = PSQT[ENDGAME][chess.KNIGHT]
-        eg_bishop = PSQT[ENDGAME][chess.BISHOP]
-        eg_rook = PSQT[ENDGAME][chess.ROOK]
-        eg_queen = PSQT[ENDGAME][chess.QUEEN]
-        eg_king = PSQT[ENDGAME][chess.KING]
-        
-        # White pawns
-        w_bb = wp & chess_board.pawns
-        while w_bb:
-            square = chess.lsb(w_bb)
-            flip_square = FLIP[square]
-            mg_score += mg_pawn[flip_square]
-            eg_score += eg_pawn[flip_square]
-            w_bb &= w_bb - 1
-        
-        # White knights
-        w_bb = wp & chess_board.knights
-        while w_bb:
-            square = chess.lsb(w_bb)
-            flip_square = FLIP[square]
-            mg_score += mg_knight[flip_square]
-            eg_score += eg_knight[flip_square]
-            w_bb &= w_bb - 1
-        
-        # White bishops
-        w_bb = wp & chess_board.bishops
-        while w_bb:
-            square = chess.lsb(w_bb)
-            flip_square = FLIP[square]
-            mg_score += mg_bishop[flip_square]
-            eg_score += eg_bishop[flip_square]
-            w_bb &= w_bb - 1
-        
-        # White rooks
-        w_bb = wp & chess_board.rooks
-        while w_bb:
-            square = chess.lsb(w_bb)
-            flip_square = FLIP[square]
-            mg_score += mg_rook[flip_square]
-            eg_score += eg_rook[flip_square]
-            w_bb &= w_bb - 1
-        
-        # White queens
-        w_bb = wp & chess_board.queens
-        while w_bb:
-            square = chess.lsb(w_bb)
-            flip_square = FLIP[square]
-            mg_score += mg_queen[flip_square]
-            eg_score += eg_queen[flip_square]
-            w_bb &= w_bb - 1
-        
-        # White king
-        w_bb = wp & chess_board.kings
-        if w_bb:
-            square = chess.lsb(w_bb)
-            flip_square = FLIP[square]
-            mg_score += mg_king[flip_square]
-            eg_score += eg_king[flip_square]
-        
-        # Black pawns
-        b_bb = bp & chess_board.pawns
-        while b_bb:
-            square = chess.lsb(b_bb)
-            mg_score -= mg_pawn[square]
-            eg_score -= eg_pawn[square]
-            b_bb &= b_bb - 1
-        
-        # Black knights
-        b_bb = bp & chess_board.knights
-        while b_bb:
-            square = chess.lsb(b_bb)
-            mg_score -= mg_knight[square]
-            eg_score -= eg_knight[square]
-            b_bb &= b_bb - 1
-        
-        # Black bishops
-        b_bb = bp & chess_board.bishops
-        while b_bb:
-            square = chess.lsb(b_bb)
-            mg_score -= mg_bishop[square]
-            eg_score -= eg_bishop[square]
-            b_bb &= b_bb - 1
-        
-        # Black rooks
-        b_bb = bp & chess_board.rooks
-        while b_bb:
-            square = chess.lsb(b_bb)
-            mg_score -= mg_rook[square]
-            eg_score -= eg_rook[square]
-            b_bb &= b_bb - 1
-        
-        # Black queens
-        b_bb = bp & chess_board.queens
-        while b_bb:
-            square = chess.lsb(b_bb)
-            mg_score -= mg_queen[square]
-            eg_score -= eg_queen[square]
-            b_bb &= b_bb - 1
-        
-        # Black king
-        b_bb = bp & chess_board.kings
-        if b_bb:
-            square = chess.lsb(b_bb)
-            mg_score -= mg_king[square]
-            eg_score -= eg_king[square]
-
-        # Inline interpolate function to save a function call
-        return
+        # Return score (material + interpolated mg/eg score)
+        return score.material + score.get_interpolated_score()
 
     # def quiescence(self, chess_board: chess.Board, alpha, beta, depth):
 
-    def alpha_beta(self, chess_board: chess.Board, depth: int, alpha, beta, maximizing_player: bool):
+    def alpha_beta(self, chess_board: chess.Board, depth: int, alpha, beta, maximizing_player: bool, score: Score):
         # Terminal node check
         if depth == 0:
-            return self.evaluate_position(chess_board), None
+            return self.evaluate_position(chess_board, score), None
         legal_moves = list(chess_board.legal_moves)
         if not legal_moves:
-            return self.evaluate_position(chess_board, has_legal_moves=False), None
+            return self.evaluate_position(chess_board, score, has_legal_moves=False), None
 
         best_move = None
         if maximizing_player:
@@ -332,9 +205,14 @@ class ChessBot:
                 if CHECKING_MOVE_ARROW and depth == DEPTH:  # Display the root move
                     self.display_checking_move_arrow(move)
 
+                old_material, old_mg, old_eg, old_npm = score.material, score.mg, score.eg, score.npm
+
+                score.update(chess_board, move)
                 chess_board.push(move)
-                value = self.alpha_beta(chess_board, depth - 1, alpha, beta, False)[0]
+                value = self.alpha_beta(chess_board, depth - 1, alpha, beta, False, score)[0]
                 chess_board.pop()
+
+                score.material, score.mg, score.eg, score.npm = old_material, old_mg, old_eg, old_npm
 
                 if value > best_value:
                     best_value = value
@@ -350,16 +228,22 @@ class ChessBot:
                 if CHECKING_MOVE_ARROW and depth == DEPTH:  # Display the root move
                     self.display_checking_move_arrow(move)
 
+                old_material, old_mg, old_eg, old_npm = score.material, score.mg, score.eg, score.npm
+
+                score.update(chess_board, move)
                 chess_board.push(move)
-                value = self.alpha_beta(chess_board, depth - 1, alpha, beta, True)[0]
+                value = self.alpha_beta(chess_board, depth - 1, alpha, beta, True, score)[0]
                 chess_board.pop()
+
+                score.material, score.mg, score.eg, score.npm = old_material, old_mg, old_eg, old_npm
+
                 if value < best_value:
                     best_value = value
                     best_move = move
                 beta = min(beta, value)
                 if value <= alpha:
                     break  # Alpha cutoff
-
+        
         return best_value, best_move
 
     # TODO ---------------------------------------------
@@ -369,18 +253,17 @@ class ChessBot:
     # def best_node_search(self, chess_board: chess.Board, alpha, beta, maximizing_player: bool):
     #     return 0
 
-    def get_move(self, board: ChessBoard):
+    def get_move(self, chess_board: chess.Board):
         """
         Main method to get the best move for the current player.
         """
-        chess_board = board.get_board_state()
-
         self.moves_checked = 0
 
         # Run minimax once with manual timing
         start_time = timeit.default_timer()
         best_value, best_move = self.alpha_beta(
-            chess_board, DEPTH, MIN_VALUE, MAX_VALUE, chess_board.turn)
+            chess_board, DEPTH, MIN_VALUE, MAX_VALUE, chess_board.turn, self.score)
+        self.score.update(chess_board, best_move)
         time_taken = timeit.default_timer() - start_time
 
         # TODO move print stuff into function
