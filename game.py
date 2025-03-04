@@ -319,14 +319,7 @@ class ChessGame:
         print(f"Number of turns: {self.board.get_board_state().fullmove_number}") # Print number of turns
         result = self.board.get_result()
         print(f"Game Over! Result: {result}")
-        
-        # # Keep window open until closed
-        # while True:
-        #     event = pygame.event.wait()
-        #     if event.type == pygame.QUIT:
-        #         break
-        # 
-        # pygame.quit()
+
 
         while 1:
             # Process all pending events at once rather than waiting

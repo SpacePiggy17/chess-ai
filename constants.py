@@ -226,7 +226,7 @@ UPDATE_DELAY_MS: np.int8 = 30  # Delay between visual updates in milliseconds
 LAST_MOVE_ARROW: bool = True  # Set to True to display last move arrow
 CHECKING_MOVE_ARROW: bool = False  # Set to True to display checking move arrow (switches the mode to svg rendering)
 BREAK_TURN: np.int8 = None # Number of turns to break after (for debugging)
-# BREAK_TURN: np.int8 = 2 # Number of turns to break after (for debugging)
+BREAK_TURN: np.int8 = 5 # Number of turns to break after (for debugging)
 TT_SIZE: np.int8 = 64 # Size of the transposition table (in MB)
 
 # Search settings

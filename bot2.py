@@ -48,10 +48,7 @@ class Score: # Positive values favor white, negative values favor black
     def update(self, chess_board: chess.Board, move: chess.Move):
         """
         Updates the material, midgame, endgame, and non-pawn material scores based on the move.
-        Returns the original values before the move was made.
         """
-        original_values = (self.material, self.mg, self.eg, self.npm)
-
         from_square = move.from_square
         to_square = move.to_square
         promotion_piece_type: chess.PieceType = move.promotion
@@ -139,8 +136,6 @@ class Score: # Positive values favor white, negative values favor black
                 # Update npm score
                 if captured_piece_type != chess.PAWN:
                     self.npm -= PIECE_VALUES_STOCKFISH[captured_piece_type]
-
-        return original_values
 
     def initialize_scores(self, chess_board: chess.Board):
         """
@@ -272,7 +267,8 @@ class ChessBot:
 
     def alpha_beta(self, chess_board: chess.Board, depth: np.int8, alpha, beta, maximizing_player: bool, score: Score):
         # Lookup position in transposition table
-        key = zobrist_hash(chess_board) # ! REALLY SLOW
+        key = chess_board._transposition_key() # ? Much faster
+        # key = zobrist_hash(chess_board) # ! REALLY SLOW
         tt_entry = self.transposition_table.get(key)
 
         # If position is in transposition table and depth is sufficient
@@ -288,6 +284,7 @@ class ChessBot:
         original_alpha = alpha
         best_move = None
         if maximizing_player:
+            original_score = score
             best_value = MIN_VALUE
             for move in self.ordered_moves_generator(chess_board, tt_move):
                 has_legal_moves = True
@@ -295,12 +292,13 @@ class ChessBot:
                 if CHECKING_MOVE_ARROW and depth >= RENDER_DEPTH:  # Display the root move
                     self.display_checking_move_arrow(move)
 
-                original_values = score.update(chess_board, move)
+                score.update(chess_board, move)
+
                 chess_board.push(move)
                 value = self.alpha_beta(chess_board, depth - 1, alpha, beta, False, score)[0]
                 chess_board.pop()
 
-                score.material, score.mg, score.eg, score.npm = original_values
+                score = original_score # Restore score
 
                 if value > best_value:
                     best_value = value
@@ -308,20 +306,23 @@ class ChessBot:
                 alpha = max(alpha, value)
                 if value >= beta:
                     break  # Beta cutoff
+                
 
         else:  # Minimizing player
+            original_score = score
             best_value = MAX_VALUE
             for move in self.ordered_moves_generator(chess_board, tt_move):
                 self.moves_checked += 1
                 if CHECKING_MOVE_ARROW and depth >= RENDER_DEPTH:  # Display the root move
                     self.display_checking_move_arrow(move)
 
-                original_values = score.update(chess_board, move)
+                score.update(chess_board, move)
+
                 chess_board.push(move)
                 value = self.alpha_beta(chess_board, depth - 1, alpha, beta, True, score)[0]
                 chess_board.pop()
 
-                score.material, score.mg, score.eg, score.npm = original_values
+                score = original_score
 
                 if value < best_value:
                     best_value = value
@@ -329,6 +330,7 @@ class ChessBot:
                 beta = min(beta, value)
                 if value <= alpha:
                     break  # Alpha cutoff
+
         
         if best_move is None: # If no legal moves, evaluate position
             return self.evaluate_position(chess_board, score, tt_entry, has_legal_moves=False), None
