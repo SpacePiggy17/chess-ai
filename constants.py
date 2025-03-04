@@ -49,7 +49,7 @@ mg_pawn_table = np.array([
     -26,  -4,  -4, -10,   3,   3, 33, -12,
     -35,  -1, -20, -23, -15,  24, 38, -22,
       0,   0,   0,   0,   0,   0,  0,   0,
-], dtype=np.int16)
+], dtype=np.int32)
 
 eg_pawn_table = np.array([
       0,   0,   0,   0,   0,   0,   0,   0,
@@ -60,7 +60,7 @@ eg_pawn_table = np.array([
       4,   7,  -6,   1,   0,  -5,  -1,  -8,
      13,   8,   8,  10,  13,   0,   2,  -7,
       0,   0,   0,   0,   0,   0,   0,   0,
-], dtype=np.int16)
+], dtype=np.int32)
 
 mg_knight_table = np.array([
     -167, -89, -34, -49,  61, -97, -15, -107,
@@ -71,7 +71,7 @@ mg_knight_table = np.array([
      -23,  -9,  12,  10,  19,  17,  25,  -16,
      -29, -53, -12,  -3,  -1,  18, -14,  -19,
     -105, -21, -58, -33, -17, -28, -19,  -23,
-], dtype=np.int16)
+], dtype=np.int32)
 
 eg_knight_table = np.array([
     -58, -38, -13, -28, -31, -27, -63, -99,
@@ -82,7 +82,7 @@ eg_knight_table = np.array([
     -23,  -3,  -1,  15,  10,  -3, -20, -22,
     -42, -20, -10,  -5,  -2, -20, -23, -44,
     -29, -51, -23, -15, -22, -18, -50, -64,
-], dtype=np.int16)
+], dtype=np.int32)
 
 mg_bishop_table = np.array([
     -29,   4, -82, -37, -25, -42,   7,  -8,
@@ -93,7 +93,7 @@ mg_bishop_table = np.array([
       0,  15,  15,  15,  14,  27,  18,  10,
       4,  15,  16,   0,   7,  21,  33,   1,
     -33,  -3, -14, -21, -13, -12, -39, -21,
-], dtype=np.int16)
+], dtype=np.int32)
 
 eg_bishop_table = np.array([
     -14, -21, -11,  -8, -7,  -9, -17, -24,
@@ -104,7 +104,7 @@ eg_bishop_table = np.array([
     -12,  -3,   8,  10, 13,   3,  -7, -15,
     -14, -18,  -7,  -1,  4,  -9, -15, -27,
     -23,  -9, -23,  -5, -9, -16,  -5, -17,
-], dtype=np.int16)
+], dtype=np.int32)
 
 mg_rook_table = np.array([
      32,  42,  32,  51, 63,  9,  31,  43,
@@ -115,7 +115,7 @@ mg_rook_table = np.array([
     -45, -25, -16, -17,  3,  0,  -5, -33,
     -44, -16, -20,  -9, -1, 11,  -6, -71,
     -19, -13,   1,  17, 16,  7, -37, -26,
-], dtype=np.int16)
+], dtype=np.int32)
 
 eg_rook_table = np.array([
     13, 10, 18, 15, 12,  12,   8,   5,
@@ -126,7 +126,7 @@ eg_rook_table = np.array([
     -4,  0, -5, -1, -7, -12,  -8, -16,
     -6, -6,  0,  2, -9,  -9, -11,  -3,
     -9,  2,  3, -1, -5, -13,   4, -20,
-], dtype=np.int16)
+], dtype=np.int32)
 
 mg_queen_table = np.array([
     -28,   0,  29,  12,  59,  44,  43,  45,
@@ -137,7 +137,7 @@ mg_queen_table = np.array([
     -14,   2, -11,  -2,  -5,   2,  14,   5,
     -35,  -8,  11,   2,   8,  15,  -3,   1,
      -1, -18,  -9,  10, -15, -25, -31, -50,
-], dtype=np.int16)
+], dtype=np.int32)
 
 eg_queen_table = np.array([
      -9,  22,  22,  27,  27,  19,  10,  20,
@@ -148,7 +148,7 @@ eg_queen_table = np.array([
     -16, -27,  15,   6,   9,  17,  10,   5,
     -22, -23, -30, -16, -16, -23, -36, -32,
     -33, -28, -22, -43,  -5, -32, -20, -41,
-], dtype=np.int16)
+], dtype=np.int32)
 
 mg_king_table = np.array([
     -65,  23,  16, -15, -56, -34,   2,  13,
@@ -159,7 +159,7 @@ mg_king_table = np.array([
     -14, -14, -22, -46, -44, -30, -15, -27,
       1,   7,  -8, -64, -43, -16,   9,   8,
     -15,  36,  12, -54,   8, -28,  24,  14,
-], dtype=np.int16)
+], dtype=np.int32)
 
 eg_king_table = np.array([
     -74, -35, -18, -18, -11,  15,   4, -17,
@@ -170,7 +170,7 @@ eg_king_table = np.array([
     -19,  -3,  11,  21,  23,  16,   7,  -9,
     -27, -11,   4,  13,  14,   4,  -5, -17,
     -53, -34, -21, -11, -28, -14, -24, -43
-], dtype=np.int16)
+], dtype=np.int32)
 
 # Flip piece square tables for white (PSQT[game_stage][piece_type][FLIP[square]])
 FLIP = np.array([
@@ -182,7 +182,7 @@ FLIP = np.array([
     16, 17, 18, 19, 20, 21, 22, 23,
      8,  9, 10, 11, 12, 13, 14, 15,
      0,  1,  2,  3,  4,  5,  6,  7,
-], dtype=np.int16)
+], dtype=np.int32)
 
 # Piece square tables for black (flip for white with PSQT[game_stage][piece_type][FLIP[square]])
 # PSQT: list[dict[chess.PieceType, np.ndarray]] = [

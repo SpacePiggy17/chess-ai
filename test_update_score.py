@@ -65,10 +65,10 @@ def test_position(fen, move_uci=None):
         eg_diff = update_score.eg - fresh_score.eg
         npm_diff = update_score.npm - fresh_score.npm
 
-        # assert(material_diff == 0)
-        # assert(mg_diff == 0)
-        # assert(eg_diff == 0)
-        # assert(npm_diff == 0)
+        assert(material_diff == 0)
+        assert(mg_diff == 0)
+        assert(eg_diff == 0)
+        assert(npm_diff == 0)
         
         print("Differences (Update - Fresh Init):")
         print(f"  Material: {highlight_diff(material_diff)}")
@@ -118,10 +118,10 @@ def test_sequence(fens, moves):
         eg_diff = score.eg - fresh.eg
         npm_diff = score.npm - fresh.npm
 
-        # assert(material_diff == 0)
-        # assert(mg_diff == 0)
-        # assert(eg_diff == 0)
-        # assert(npm_diff == 0)
+        assert(material_diff == 0)
+        assert(mg_diff == 0)
+        assert(eg_diff == 0)
+        assert(npm_diff == 0)
         
         print(f"Differences after move {i+1} (Update - Fresh Init):")
         print(f"  Material: {highlight_diff(material_diff)}")

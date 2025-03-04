@@ -6,7 +6,9 @@ from timeit import default_timer as timer
 import sys
 from bot2 import Score, BISHOP_PAIR_BONUS, PIECE_VALUES_STOCKFISH
 
-MAX_NODES = 100_000  # Maximum nodes to visit in simulated search
+# ! This test concludes that the initialize approach is faster than the update approach but this is incorrect in practice.
+
+MAX_NODES = 20_000  # Maximum nodes to visit in simulated search
 MAX_DEPTH = 7  # Maximum depth to search
 
 class TestScoreUpdate(unittest.TestCase):
@@ -147,11 +149,14 @@ class BenchmarkTests(unittest.TestCase):
         print(f"Initialize approach: {init_time:.6f}s")
         
         if update_time > 0:
-            speed_ratio = init_time / update_time
-            print(f"Speed ratio: Initialize is {speed_ratio:.2f}x {'faster' if speed_ratio > 1 else 'slower'}")
+            if init_time < update_time:
+                speed_ratio = update_time / init_time
+                print(f"Speed ratio: Initialize is {speed_ratio:.2f}x faster")
+            else:
+                speed_ratio = init_time / update_time
+                print(f"Speed ratio: Update is {speed_ratio:.2f}x faster")
         
-        # This isn't really an assertion, just informational
-        self.assertTrue(True)
+        self.assertTrue(True)  # Not a real assertion
         
     def _run_benchmark(self, max_depth, branching_factor, sample_size):
         """Run the benchmark comparing update vs. initialize."""
@@ -221,11 +226,14 @@ class BenchmarkTests(unittest.TestCase):
         print(f"\nAlpha-Beta Search Simulation (Depth {max_depth}, {nodes_visited} nodes):")
         print(f"Update approach: {update_time:.6f}s")
         print(f"Initialize approach: {init_time:.6f}s")
-        
+
         if update_time > 0:
-            speed_ratio = init_time / update_time
-            print(f"Speed ratio: {'Initialize' if speed_ratio > 1 else 'Update'} is "
-                  f"{max(speed_ratio, 1/speed_ratio):.2f}x faster")
+            if init_time < update_time:
+                speed_ratio = update_time / init_time
+                print(f"  Result: Initialize is {speed_ratio:.2f}x faster at depth {max_depth}")
+            else:
+                speed_ratio = init_time / update_time
+                print(f"  Result: Update is {speed_ratio:.2f}x faster at depth {max_depth}")
         
         self.assertTrue(True)  # Not a real assertion
     
@@ -337,10 +345,12 @@ if __name__ == "__main__":
         print(f"  Initialize approach: {init_time:.6f}s")
         
         if update_time > 0:
-            speed_ratio = init_time / update_time
-            faster = "Initialize" if speed_ratio > 1 else "Update"
-            ratio = max(speed_ratio, 1/speed_ratio)
-            print(f"  Result: {faster} is {ratio:.2f}x faster at depth {depth}")
+            if init_time < update_time:
+                speed_ratio = update_time / init_time
+                print(f"  Result: Initialize is {speed_ratio:.2f}x faster at depth {depth}")
+            else:
+                speed_ratio = init_time / update_time
+                print(f"  Result: Update is {speed_ratio:.2f}x faster at depth {depth}")
     
     print("\nConclusion:")
     print("The most efficient approach depends on the search depth and")

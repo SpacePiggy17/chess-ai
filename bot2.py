@@ -48,14 +48,14 @@ class Score: # Positive values favor white, negative values favor black
     def update(self, chess_board: chess.Board, move: chess.Move):
         """
         Updates the material, midgame, endgame, and non-pawn material scores based on the move.
+        Much faster than re-evaluating the entire board, even if only the leaf nodes are re-evaluated.
         """
         from_square = move.from_square
         to_square = move.to_square
         promotion_piece_type: chess.PieceType = move.promotion
 
-        piece: chess.Piece = chess_board.piece_at(from_square)
-        piece_type: chess.PieceType = piece.piece_type
-        piece_color = piece.color
+        piece_type = chess_board.piece_type_at(from_square)
+        piece_color = chess_board.turn
         color_multiplier = 1 if piece_color else -1
 
         # Cache tables for faster lookups
@@ -97,24 +97,12 @@ class Score: # Positive values favor white, negative values favor black
             self.material += color_multiplier * (piece_values[promotion_piece_type] - piece_values[chess.PAWN])
             self.mg += color_multiplier * (mg_tables[promotion_piece_type][new_to_square] - mg_tables[chess.PAWN][new_from_square])
             self.eg += color_multiplier * (eg_tables[promotion_piece_type][new_to_square] - eg_tables[chess.PAWN][new_from_square])
-            # if piece_color: # White promotion
-            #     self.mg += mg_tables[promotion_piece_type][flip[to_square]] - mg_tables[chess.PAWN][flip[from_square]]
-            #     self.eg += eg_tables[promotion_piece_type][flip[to_square]] - eg_tables[chess.PAWN][flip[from_square]]
-            # else: # Black promotion
-            #     self.mg -= mg_tables[promotion_piece_type][to_square] - mg_tables[chess.PAWN][from_square]
-            #     self.eg -= eg_tables[promotion_piece_type][to_square] - eg_tables[chess.PAWN][from_square]
 
         else: # Normal move
             mg_table = mg_tables[piece_type]
             eg_table = eg_tables[piece_type]
             self.mg += color_multiplier * (mg_table[new_to_square] - mg_table[new_from_square])
             self.eg += color_multiplier * (eg_table[new_to_square] - eg_table[new_from_square])
-            # if piece_color: # White move
-            #     self.mg += mg_table[flip[to_square]] - mg_table[flip[from_square]]
-            #     self.eg += eg_table[flip[to_square]] - eg_table[flip[from_square]]
-            # else: # Black move
-            #     self.mg -= mg_table[to_square] - mg_table[from_square]
-            #     self.eg -= eg_table[to_square] - eg_table[from_square]
 
         if castling: # Done if castling
             return
@@ -128,30 +116,6 @@ class Score: # Positive values favor white, negative values favor black
             captured_piece = chess_board.piece_at(to_square)
 
         if captured_piece: # Capture
-        #     captured_piece_type = captured_piece.piece_type
-        #     captured_piece_color = captured_piece.color
-
-        #     # Update npm score
-        #     if captured_piece_type != chess.PAWN:
-        #         self.npm -= piece_values[captured_piece_type]
-
-        #         # Update bishop pair bonus if bishop captured
-        #         if captured_piece_type == chess.BISHOP and chess_board.pieces_mask(chess.BISHOP, captured_piece_color).bit_count() == 2:
-        #             self.material -= color_multiplier * BISHOP_PAIR_BONUS
-
-        #     if captured_piece_color: # Flip squares for white
-        #         from_square, to_square = flip[from_square], flip[to_square]
-
-        # # Only check en passant if no direct capture
-        # is_en_passant = False
-        # if not captured_piece and piece_type == chess.PAWN:
-        #     is_en_passant = chess_board.is_en_passant(move)
-        # if captured_piece or is_en_passant: # Capture
-        #     if is_en_passant: # Get the captured pawn from en passant
-        #         # Update captured piece and square
-        #         to_square += -8 if piece_color else 8
-        #         captured_piece = chess_board.piece_at(to_square)
-
             captured_piece_type = captured_piece.piece_type
             captured_piece_color = captured_piece.color
             if captured_piece_type != chess.PAWN:
@@ -160,30 +124,15 @@ class Score: # Positive values favor white, negative values favor black
 
                 # Update bishop pair bonus if bishop captured
                 if captured_piece_type == chess.BISHOP and chess_board.pieces_mask(captured_piece_type, captured_piece_color).bit_count() == 2:
-                    self.material -= -color_multiplier * BISHOP_PAIR_BONUS
-
-
-            # if captured_piece_type == chess.BISHOP: # Update bishop pair bonus
-            #     bishop_count_before = chess_board.pieces_mask(captured_piece_type, captured_piece_color).bit_count()
-            #     if bishop_count_before == 2: # If less than 2 bishops now, remove bonus
-            #         self.material += (BISHOP_PAIR_BONUS) * (-1 if captured_piece_color else 1)
+                    self.material -= -color_multiplier * BISHOP_PAIR_BONUS # If 2 bishops before, remove bonus
 
             if captured_piece_color: # Flip squares for white
-                from_square, to_square = flip[from_square], flip[to_square]
+                to_square = flip[to_square]
 
             # Remove captured piece from material and position scores
             self.material -= -color_multiplier * piece_values[captured_piece_type]
             self.mg -= -color_multiplier * mg_tables[captured_piece_type][to_square]
             self.eg -= -color_multiplier * eg_tables[captured_piece_type][to_square]
-
-            # if captured_piece_color: # White piece captured
-            #     self.material -= piece_values[captured_piece_type]
-            #     self.mg -= mg_tables[captured_piece_type][flip[to_square]]
-            #     self.eg -= eg_tables[captured_piece_type][flip[to_square]]
-            # else: # Black piece captured
-            #     self.material += piece_values[captured_piece_type]
-            #     self.mg += mg_tables[captured_piece_type][to_square]
-            #     self.eg += eg_tables[captured_piece_type][to_square]
 
     def initialize_scores(self, chess_board: chess.Board):
         """
@@ -192,6 +141,11 @@ class Score: # Positive values favor white, negative values favor black
         Evaluates piece positions using PSQT with interpolation between middlegame and endgame.
         Runs only once so not optimized for clarity.
         """
+        self.material = 0
+        self.mg = 0
+        self.eg = 0
+        self.npm = 0
+
         white_bishop_count = 0
         black_bishop_count = 0
 
@@ -233,6 +187,7 @@ class ChessBot:
         self.game: "ChessGame" = game
         self.moves_checked: int = 0
 
+        # Initialize transposition table with size in MB
         tt_entry_size = getsizeof(TTEntry(0, 0, EXACT, chess.Move.from_uci("e2e4")))
         self.transposition_table = LRU(int(TT_SIZE * 1024 * 1024 / tt_entry_size))  # Initialize TT with size in MB
 
@@ -265,7 +220,7 @@ class ChessBot:
 
         # Return score (material + interpolated mg/eg score)
         phase = min(score.npm // NPM_SCALAR, 256) # Phase value between 0 and 256 (0 = endgame, 256 = opening)
-        interpolated_score = ((score.mg * phase) + (score.eg * (256 - phase))) >> 8 # Int division by 256
+        interpolated_score = ((int(score.mg) * phase) + (int(score.eg) * (256 - phase))) >> 8 # Int division by 256
         return score.material + interpolated_score
 
     # def quiescence(self, chess_board: chess.Board, alpha, beta, depth):
@@ -279,7 +234,7 @@ class ChessBot:
         # Sort remaining moves
         ordered_moves = []
         for move in chess_board.legal_moves:
-            if not tt_move or move != tt_move: # Skip TT move
+            if not tt_move or move != tt_move: # Skip TT move since already yielded
                 score = 0
 
                 # Capturing a piece bonus (MVV/LVA - Most Valuable Victim/Least Valuable Attacker)
