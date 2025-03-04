@@ -4,7 +4,7 @@ from typing_extensions import TypeAlias  # For GameStage
 
 # Set to None for standard starting position, or FEN string for custom starting position
 STARTING_FEN: str = None
-# STARTING_FEN: str = "rnb2knr/ppp2ppp/8/4P2Q/2p1P3/2N5/PPP2PPP/2KR2NR b - - 1 10"
+# STARTING_FEN: str = "r1b1r1k1/ppp2qbp/6p1/1N1p4/5B2/3p2P1/PPPK1p1P/R4Q1B w - - 0 25"
 
 # Board and piece settings
 PIECE_VALUES: dict[int, int] = {
@@ -23,6 +23,7 @@ PIECE_VALUES_STOCKFISH: dict[int, int] = {
     chess.QUEEN: 2_538,
     chess.KING: 32_000
 }
+BISHOP_PAIR_BONUS: int = PIECE_VALUES_STOCKFISH[chess.PAWN] >> 1 # Half the value of a pawn
 
 # Total npm at start (16604 with stockfish values)
 START_NPM: np.int16 = PIECE_VALUES_STOCKFISH[chess.KNIGHT] * 4 + \
@@ -224,10 +225,11 @@ IS_BOT: bool = True  # Set to False for human vs bot, True for bot vs bot
 UPDATE_DELAY_MS: np.int8 = 30  # Delay between visual updates in milliseconds
 LAST_MOVE_ARROW: bool = True  # Set to True to display last move arrow
 CHECKING_MOVE_ARROW: bool = False  # Set to True to display checking move arrow (switches the mode to svg rendering)
-BREAK_TURN: np.int8 = 2 # Number of turns to break after (for debugging)
+BREAK_TURN: np.int8 = None # Number of turns to break after (for debugging)
+# BREAK_TURN: np.int8 = 2 # Number of turns to break after (for debugging)
 TT_SIZE: np.int8 = 64 # Size of the transposition table (in MB)
 
 # Search settings
 DEPTH = 5  # Search depth for the minimax algorithm
 RENDER_DEPTH = 5 # Depth to render checking moves (set to DEPTH to render root moves)
-RENDER_DEPTH = 0 # Depth to render checking moves (set to DEPTH to render root moves)
+# RENDER_DEPTH = 0 # Depth to render checking moves (set to DEPTH to render root moves)

@@ -1,6 +1,6 @@
 import chess
 # from board import ChessBoard
-from chess.polyglot import zobrist_hash # Built-in Zobrist hashing
+from chess.polyglot import zobrist_hash # Built-in Zobrist hashing  TODO implement incremental hashing
 
 from dataclasses import dataclass  # For TT entries and scores
 from typing_extensions import TypeAlias  # For flags
@@ -13,7 +13,7 @@ from lru import LRU  # For TT and history tables
 from sys import getsizeof # For memory usage
 
 from constants import DEPTH, MAX_VALUE, MIN_VALUE, CHECKING_MOVE_ARROW, RENDER_DEPTH, TT_SIZE, \
-    PIECE_VALUES_STOCKFISH, FLIP, MIDGAME, ENDGAME, PSQT, CASTLING_UPDATES, NPM_SCALAR
+    PIECE_VALUES_STOCKFISH, BISHOP_PAIR_BONUS, FLIP, MIDGAME, ENDGAME, PSQT, CASTLING_UPDATES, NPM_SCALAR
 
 import colors  # Debug log colors
 from timeit import default_timer # For debugging timing
@@ -29,6 +29,7 @@ LOWERBOUND: Flag = 3 # Beta (fail-high)
 @dataclass
 class TTEntry:
     __slots__ = ["depth", "value", "flag", "best_move"] # Optimization for faster lookups
+
     depth: np.int8
     value: np.int16
     flag: Flag
@@ -38,6 +39,7 @@ class TTEntry:
 @dataclass
 class Score: # Positive values favor white, negative values favor black
     __slots__ = ["material", "mg", "eg", "npm"] # Optimization for faster lookups
+
     material: np.int16 # Material score
     mg: np.int16 # Midgame score
     eg: np.int16 # Endgame score
@@ -52,7 +54,7 @@ class Score: # Positive values favor white, negative values favor black
 
         from_square = move.from_square
         to_square = move.to_square
-        promotion: chess.PieceType = move.promotion
+        promotion_piece_type: chess.PieceType = move.promotion
 
         piece: chess.Piece = chess_board.piece_at(from_square)
         piece_type: chess.PieceType = piece.piece_type
@@ -80,16 +82,21 @@ class Score: # Positive values favor white, negative values favor black
                     self.eg -= eg_rook_table[rook_to] - eg_rook_table[rook_from]
                 
         # Update position scores for moving piece
-        if promotion: # Promotion
-            self.npm += PIECE_VALUES_STOCKFISH[promotion]
+        if promotion_piece_type: # Promotion
+            if promotion_piece_type == chess.BISHOP: # Update bishop pair bonus
+                bishop_count_before = chess_board.pieces_mask(chess.BISHOP, piece_color).bit_count()
+                if bishop_count_before == 1: # If 2 bishops now, add bonus
+                    self.material += (BISHOP_PAIR_BONUS) * (1 if piece_color else -1)
+
+            self.npm += PIECE_VALUES_STOCKFISH[promotion_piece_type]
             if piece_color: # White promotion
-                self.material += PIECE_VALUES_STOCKFISH[promotion] - PIECE_VALUES_STOCKFISH[chess.PAWN]
-                self.mg += mg_tables[promotion][FLIP[to_square]] - mg_tables[chess.PAWN][FLIP[from_square]]
-                self.eg += eg_tables[promotion][FLIP[to_square]] - eg_tables[chess.PAWN][FLIP[from_square]]
+                self.material += PIECE_VALUES_STOCKFISH[promotion_piece_type] - PIECE_VALUES_STOCKFISH[chess.PAWN]
+                self.mg += mg_tables[promotion_piece_type][FLIP[to_square]] - mg_tables[chess.PAWN][FLIP[from_square]]
+                self.eg += eg_tables[promotion_piece_type][FLIP[to_square]] - eg_tables[chess.PAWN][FLIP[from_square]]
             else: # Black promotion
-                self.material -= PIECE_VALUES_STOCKFISH[promotion] - PIECE_VALUES_STOCKFISH[chess.PAWN]
-                self.mg -= mg_tables[promotion][to_square] - mg_tables[chess.PAWN][from_square]
-                self.eg -= eg_tables[promotion][to_square] - eg_tables[chess.PAWN][from_square]
+                self.material -= PIECE_VALUES_STOCKFISH[promotion_piece_type] - PIECE_VALUES_STOCKFISH[chess.PAWN]
+                self.mg -= mg_tables[promotion_piece_type][to_square] - mg_tables[chess.PAWN][from_square]
+                self.eg -= eg_tables[promotion_piece_type][to_square] - eg_tables[chess.PAWN][from_square]
         else: # Normal move
             mg_table = mg_tables[piece_type]
             eg_table = eg_tables[piece_type]
@@ -110,11 +117,17 @@ class Score: # Positive values favor white, negative values favor black
             if captured_piece or is_en_passant: # Capture
                 if is_en_passant: # Get the captured pawn from en passant
                     # Update captured piece and square
-                    to_square += 8 if piece_color else -8
+                    to_square += -8 if piece_color else 8
                     captured_piece = chess_board.piece_at(to_square)
 
                 captured_piece_type = captured_piece.piece_type
-                if captured_piece.color: # White piece captured
+                captured_piece_color = captured_piece.color
+                if captured_piece_type == chess.BISHOP: # Update bishop pair bonus
+                    bishop_count_before = chess_board.pieces_mask(captured_piece_type, captured_piece_color).bit_count()
+                    if bishop_count_before == 2: # If less than 2 bishops now, remove bonus
+                        self.material += (BISHOP_PAIR_BONUS) * (-1 if captured_piece_color else 1)
+
+                if captured_piece_color: # White piece captured
                     self.material -= PIECE_VALUES_STOCKFISH[captured_piece_type]
                     self.mg -= mg_tables[captured_piece_type][FLIP[to_square]]
                     self.eg -= eg_tables[captured_piece_type][FLIP[to_square]]
@@ -166,24 +179,16 @@ class Score: # Positive values favor white, negative values favor black
 
         # Bishop pair bonus worth half a pawn
         if white_bishop_count >= 2:
-            self.material += PIECE_VALUES_STOCKFISH[chess.PAWN] >> 1
+            self.material += BISHOP_PAIR_BONUS
         if black_bishop_count >= 2:
-            self.material -= PIECE_VALUES_STOCKFISH[chess.PAWN] >> 1
-
-    def get_interpolated_score(self) -> np.int16:
-        """Interpolates between midgame and endgame scores based on phase."""
-        phase = self.npm // NPM_SCALAR # Phase value between 0 and 256 (0 = endgame, 256 = opening)
-        return ((self.mg * phase) + (self.eg * (256 - phase))) >> 8 # = // 256 # ! SLOW????
+            self.material -= BISHOP_PAIR_BONUS
 
 class ChessBot:
-    __slots__ = ["game", "moves_checked", "score", "transposition_table"]  # Optimization for fast lookups
+    __slots__ = ["game", "moves_checked", "transposition_table"]  # Optimization for fast lookups
 
     def __init__(self, game):
         self.game: "ChessGame" = game
         self.moves_checked: int = 0
-
-        self.score = Score(0, 0, 0, 0)  # Score object to store material, mg, eg, and npm scores
-        self.score.initialize_scores(self.game.board.get_board_state()) # Initialize scores once and update from there
 
         tt_entry_size = getsizeof(TTEntry(0, 0, EXACT, chess.Move.from_uci("e2e4")))
         self.transposition_table = LRU(int(TT_SIZE * 1024 * 1024 / tt_entry_size))  # Initialize TT with size in MB
@@ -203,7 +208,7 @@ class ChessBot:
 
         # Check expensive operations once
         if has_legal_moves:
-            has_legal_moves = any(chess_board.legal_moves) # ! SLOW
+            has_legal_moves = any(chess_board.legal_moves) # ! REALLY SLOW
 
         # Evaluate game-ending conditions
         if not has_legal_moves:  # No legal moves
@@ -216,36 +221,76 @@ class ChessBot:
             return 0
 
         # Return score (material + interpolated mg/eg score)
-        return score.material + score.get_interpolated_score()
+        phase = min(score.npm // NPM_SCALAR, 256) # Phase value between 0 and 256 (0 = endgame, 256 = opening)
+        interpolated_score = ((score.mg * phase) + (score.eg * (256 - phase))) >> 8 # Int division by 256
+        return score.material + interpolated_score
 
     # def quiescence(self, chess_board: chess.Board, alpha, beta, depth):
 
+    def ordered_moves_generator(self, chess_board: chess.Board, tt_move: Optional[chess.Move]):
+        """Generate ordered moves for the current position."""
+        # Yield transposition table move first
+        if tt_move:
+            yield tt_move
+
+        # Sort remaining moves
+        ordered_moves = []
+        for move in chess_board.legal_moves:
+            if not tt_move or move != tt_move: # Skip TT move
+                score = 0
+
+                # Capturing a piece bonus (MVV/LVA - Most Valuable Victim/Least Valuable Attacker)
+                if chess_board.is_capture(move):
+                    victim = chess_board.piece_at(move.to_square)
+                    attacker = chess_board.piece_at(move.from_square)
+
+                    # Handle en passant captures
+                    if victim is None and move.to_square == chess_board.ep_square:
+                        victim = chess_board.piece_at(move.to_square + (-8 if attacker.color else 8))
+                        score += 5 # Small bonus for en passant captures
+
+                    if victim and attacker:
+                        # Prioritize capturing higher value pieces using lower value pieces
+                        score += 10_000 + PIECE_VALUES_STOCKFISH[victim.piece_type] - PIECE_VALUES_STOCKFISH[attacker.piece_type]
+
+                if move.promotion: # Promotion bonus
+                    score += 1_000 + PIECE_VALUES_STOCKFISH[move.promotion] - PIECE_VALUES_STOCKFISH[chess.PAWN]
+
+                # if chess_board.gives_check(move): # Check bonus
+                #     score += 100
+
+                # # Center control bonus
+                # if move.to_square in CENTER_SQUARES:
+                #     score += 100
+
+                ordered_moves.append((move, score))
+
+        ordered_moves.sort(key=lambda x: x[1], reverse=True)
+
+        yield from (move for move, _ in ordered_moves)
+
+
     def alpha_beta(self, chess_board: chess.Board, depth: np.int8, alpha, beta, maximizing_player: bool, score: Score):
         # Lookup position in transposition table
-        key = zobrist_hash(chess_board)
+        key = zobrist_hash(chess_board) # ! REALLY SLOW
         tt_entry = self.transposition_table.get(key)
 
         # If position is in transposition table and depth is sufficient
         if tt_entry and tt_entry.depth >= depth:
             if (tt_entry.flag == EXACT) or (tt_entry.flag == LOWERBOUND and tt_entry.value >= beta) or (tt_entry.flag == UPPERBOUND and tt_entry.value <= alpha):
-
                 return tt_entry.value, tt_entry.best_move
 
         # Terminal node check
         if depth == 0:
             return self.evaluate_position(chess_board, score, tt_entry), None
-        legal_moves = list(chess_board.legal_moves)
-        if not legal_moves:
-            return self.evaluate_position(chess_board, score, tt_entry, has_legal_moves=False), None
 
-        # TODO If position has a known best move, search it first
-
+        tt_move = tt_entry.best_move if tt_entry else None
         original_alpha = alpha
-
         best_move = None
         if maximizing_player:
             best_value = MIN_VALUE
-            for move in legal_moves:
+            for move in self.ordered_moves_generator(chess_board, tt_move):
+                has_legal_moves = True
                 self.moves_checked += 1
                 if CHECKING_MOVE_ARROW and depth >= RENDER_DEPTH:  # Display the root move
                     self.display_checking_move_arrow(move)
@@ -266,7 +311,7 @@ class ChessBot:
 
         else:  # Minimizing player
             best_value = MAX_VALUE
-            for move in legal_moves:
+            for move in self.ordered_moves_generator(chess_board, tt_move):
                 self.moves_checked += 1
                 if CHECKING_MOVE_ARROW and depth >= RENDER_DEPTH:  # Display the root move
                     self.display_checking_move_arrow(move)
@@ -285,6 +330,9 @@ class ChessBot:
                 if value <= alpha:
                     break  # Alpha cutoff
         
+        if best_move is None: # If no legal moves, evaluate position
+            return self.evaluate_position(chess_board, score, tt_entry, has_legal_moves=False), None
+
         # Store position in transposition table
         flag = EXACT
         if best_value <= original_alpha:
@@ -308,20 +356,34 @@ class ChessBot:
         """
         self.moves_checked = 0
 
+
         # Run minimax once with manual timing
         start_time = default_timer()
+
+        temp_score = Score(
+            self.game.score.material,
+            self.game.score.mg,
+            self.game.score.eg,
+            self.game.score.npm)
         best_value, best_move = self.alpha_beta(
-            chess_board, DEPTH, MIN_VALUE, MAX_VALUE, chess_board.turn, self.score)
-        self.score.update(chess_board, best_move)
+            chess_board,
+            DEPTH,
+            MIN_VALUE,
+            MAX_VALUE,
+            chess_board.turn,
+            temp_score)
+        self.game.score.update(chess_board, best_move)
+
         time_taken = default_timer() - start_time
 
         # TODO move print stuff into function
         # Moves checked over time taken
         time_per_move = time_taken / self.moves_checked if self.moves_checked > 0 else 0
+        moves_per_second = 1 / time_per_move if time_per_move > 0 else 0
         print(f"Moves/Time: {colors.BOLD}{colors.get_moves_color(self.moves_checked)}{self.moves_checked:,}{colors.RESET} / "
               f"{colors.BOLD}{colors.get_move_time_color(time_taken)}{time_taken:.2f}{colors.RESET} s = "
               f"{colors.BOLD}{colors.CYAN}{time_per_move * 1000:.4f}{colors.RESET} ms/M, "
-              f"{colors.BOLD}{colors.CYAN}{1 / time_per_move:,.0f}{colors.RESET} M/s")
+              f"{colors.BOLD}{colors.CYAN}{moves_per_second:,.0f}{colors.RESET} M/s")
 
         # Calculate memory usage more accurately
         tt_entry_size = getsizeof(TTEntry(0, 0, EXACT, chess.Move.from_uci("e2e4")))

@@ -1,19 +1,19 @@
 import chess
 import chess.svg
 from board import ChessBoard
-from bot2 import ChessBot
+from bot2 import ChessBot, Score
 from human import HumanPlayer
 import pygame
 import cairosvg
 import io
 from PIL import Image
-import math # For fast render arrows
+import math # For quick render arrows
 
-from constants import IS_BOT, UPDATE_DELAY_MS, LAST_MOVE_ARROW, CHECKING_MOVE_ARROW, BREAK_TURN
+from constants import IS_BOT, NPM_SCALAR, UPDATE_DELAY_MS, LAST_MOVE_ARROW, CHECKING_MOVE_ARROW, BREAK_TURN
 
 class ChessGame:
-    __slots__ = ['board', 'checking_move', 'last_move', 'last_update_time', 'white_player', 'black_player', 'piece_images', 'square_colors', 'highlighted_square_color', 'WINDOW_SIZE', 'screen', 'empty_board_surface', 'last_board_state']
-    
+    __slots__ = ["board", "checking_move", "last_move", "last_update_time", "score", "white_player", "black_player", "piece_images", "square_colors", "highlighted_square_color", "WINDOW_SIZE", "screen", "empty_board_surface", "last_board_state"]
+
     def __init__(self):
         self.board = ChessBoard()
 
@@ -21,6 +21,9 @@ class ChessGame:
         self.last_move = None # Last move played
         self.last_update_time: int = pygame.time.get_ticks()
         
+        self.score = Score(0, 0, 0, 0)  # Score object to store material, mg, eg, and npm scores
+        self.score.initialize_scores(self.board.get_board_state()) # Initialize scores once and update from there
+
         # Initialize players based on IS_BOT flag
         if IS_BOT:
             self.white_player = ChessBot(self)
@@ -289,17 +292,25 @@ class ChessGame:
             if not self.board.make_move(move):
                 print(f"Illegal move attempted: {move}")
                 break
-                
-            # TODO Create generic evaluation function
-            if current_player == self.white_player and type(self.white_player) == ChessBot:
-                print(f"Eval: {self.white_player.evaluate_position(self.board.get_board_state(), self.white_player.score)}")
-            else:
-                print(f"Eval: {self.black_player.evaluate_position(self.board.get_board_state(), self.black_player.score)}")
-            # print(f"Move played: {move}")
+
+            phase = min(self.score.npm // NPM_SCALAR, 256) # Phase value between 0 and 256 (0 = endgame, 256 = opening)
+            interpolated_score = ((self.score.mg * phase) + (self.score.eg * (256 - phase))) >> 8 # Int division by 256
+            cached_score = self.score.material + interpolated_score
+
+            # Test if cached score is correct
+            actual_score = Score(0, 0, 0, 0)
+            actual_score.initialize_scores(self.board.get_board_state())
+
+            phase = min(actual_score.npm // NPM_SCALAR, 256)
+            interpolated_score = ((actual_score.mg * phase) + (actual_score.eg * (256 - phase))) >> 8
+            actual_score = actual_score.material + interpolated_score
+
+            print(f"Eval: {cached_score}, {actual_score}")
+            print(f"Move played: {move}")
             print("-------------------")
             self.last_move = move
 
-            if self.board.get_board_state().fullmove_number > BREAK_TURN:
+            if BREAK_TURN and self.board.get_board_state().fullmove_number > BREAK_TURN:
                 pygame.quit()
                 return
             
