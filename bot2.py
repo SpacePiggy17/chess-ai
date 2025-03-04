@@ -58,8 +58,10 @@ class Score: # Positive values favor white, negative values favor black
         piece_color = piece.color
 
         # Cache tables for faster lookups
+        piece_values = PIECE_VALUES_STOCKFISH
         mg_tables = PSQT[MIDGAME]
         eg_tables = PSQT[ENDGAME]
+        flip = FLIP
 
         # Update rook scores for castling
         castling = False
@@ -72,8 +74,8 @@ class Score: # Positive values favor white, negative values favor black
                 eg_rook_table = eg_tables[chess.ROOK]
                 
                 if piece_color: # White castling
-                    self.mg += mg_rook_table[FLIP[rook_to]] - mg_rook_table[FLIP[rook_from]]
-                    self.eg += eg_rook_table[FLIP[rook_to]] - eg_rook_table[FLIP[rook_from]]
+                    self.mg += mg_rook_table[flip[rook_to]] - mg_rook_table[flip[rook_from]]
+                    self.eg += eg_rook_table[flip[rook_to]] - eg_rook_table[flip[rook_from]]
                 else: # Black castling
                     self.mg -= mg_rook_table[rook_to] - mg_rook_table[rook_from]
                     self.eg -= eg_rook_table[rook_to] - eg_rook_table[rook_from]
@@ -85,21 +87,21 @@ class Score: # Positive values favor white, negative values favor black
                 if bishop_count_before == 1: # If 2 bishops now, add bonus
                     self.material += (BISHOP_PAIR_BONUS) * (1 if piece_color else -1)
 
-            self.npm += PIECE_VALUES_STOCKFISH[promotion_piece_type]
+            self.npm += piece_values[promotion_piece_type]
             if piece_color: # White promotion
-                self.material += PIECE_VALUES_STOCKFISH[promotion_piece_type] - PIECE_VALUES_STOCKFISH[chess.PAWN]
-                self.mg += mg_tables[promotion_piece_type][FLIP[to_square]] - mg_tables[chess.PAWN][FLIP[from_square]]
-                self.eg += eg_tables[promotion_piece_type][FLIP[to_square]] - eg_tables[chess.PAWN][FLIP[from_square]]
+                self.material += piece_values[promotion_piece_type] - piece_values[chess.PAWN]
+                self.mg += mg_tables[promotion_piece_type][flip[to_square]] - mg_tables[chess.PAWN][flip[from_square]]
+                self.eg += eg_tables[promotion_piece_type][flip[to_square]] - eg_tables[chess.PAWN][flip[from_square]]
             else: # Black promotion
-                self.material -= PIECE_VALUES_STOCKFISH[promotion_piece_type] - PIECE_VALUES_STOCKFISH[chess.PAWN]
+                self.material -= piece_values[promotion_piece_type] - piece_values[chess.PAWN]
                 self.mg -= mg_tables[promotion_piece_type][to_square] - mg_tables[chess.PAWN][from_square]
                 self.eg -= eg_tables[promotion_piece_type][to_square] - eg_tables[chess.PAWN][from_square]
         else: # Normal move
             mg_table = mg_tables[piece_type]
             eg_table = eg_tables[piece_type]
             if piece_color: # White move
-                self.mg += mg_table[FLIP[to_square]] - mg_table[FLIP[from_square]]
-                self.eg += eg_table[FLIP[to_square]] - eg_table[FLIP[from_square]]
+                self.mg += mg_table[flip[to_square]] - mg_table[flip[from_square]]
+                self.eg += eg_table[flip[to_square]] - eg_table[flip[from_square]]
             else: # Black move
                 self.mg -= mg_table[to_square] - mg_table[from_square]
                 self.eg -= eg_table[to_square] - eg_table[from_square]
@@ -125,17 +127,17 @@ class Score: # Positive values favor white, negative values favor black
                         self.material += (BISHOP_PAIR_BONUS) * (-1 if captured_piece_color else 1)
 
                 if captured_piece_color: # White piece captured
-                    self.material -= PIECE_VALUES_STOCKFISH[captured_piece_type]
-                    self.mg -= mg_tables[captured_piece_type][FLIP[to_square]]
-                    self.eg -= eg_tables[captured_piece_type][FLIP[to_square]]
+                    self.material -= piece_values[captured_piece_type]
+                    self.mg -= mg_tables[captured_piece_type][flip[to_square]]
+                    self.eg -= eg_tables[captured_piece_type][flip[to_square]]
                 else: # Black piece captured
-                    self.material += PIECE_VALUES_STOCKFISH[captured_piece_type]
+                    self.material += piece_values[captured_piece_type]
                     self.mg += mg_tables[captured_piece_type][to_square]
                     self.eg += eg_tables[captured_piece_type][to_square]
 
                 # Update npm score
                 if captured_piece_type != chess.PAWN:
-                    self.npm -= PIECE_VALUES_STOCKFISH[captured_piece_type]
+                    self.npm -= piece_values[captured_piece_type]
 
     def initialize_scores(self, chess_board: chess.Board):
         """
@@ -306,7 +308,6 @@ class ChessBot:
                 alpha = max(alpha, value)
                 if value >= beta:
                     break  # Beta cutoff
-                
 
         else:  # Minimizing player
             original_score = score
