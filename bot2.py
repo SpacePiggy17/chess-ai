@@ -45,7 +45,7 @@ class Score: # Positive values favor white, negative values favor black
     eg: np.int16 # Endgame score
     npm: np.int16 # Non-pawn material (for phase calculation)
 
-    def update(self, chess_board: chess.Board, move: chess.Move):
+    def update(self, chess_board: chess.Board, move: chess.Move) -> None:
         """
         Updates the material, midgame, endgame, and non-pawn material scores based on the move.
         Much faster than re-evaluating the entire board, even if only the leaf nodes are re-evaluated.
@@ -108,25 +108,23 @@ class Score: # Positive values favor white, negative values favor black
             return
         
         # Handle captures
-        captured_piece: chess.Piece = chess_board.piece_at(to_square)
+        captured_piece_type = chess_board.piece_type_at(to_square)
 
         # Get en passant capture piece if applicable
-        if not captured_piece and piece_type == chess.PAWN and chess_board.is_en_passant(move):
+        if not captured_piece_type and piece_type == chess.PAWN and chess_board.is_en_passant(move):
             to_square -= color_multiplier * 8
-            captured_piece = chess_board.piece_at(to_square)
+            captured_piece_type = chess_board.piece_type_at(from_square)
 
-        if captured_piece: # Capture
-            captured_piece_type = captured_piece.piece_type
-            captured_piece_color = captured_piece.color
+        if captured_piece_type: # Capture
             if captured_piece_type != chess.PAWN:
                 # Update npm score
                 self.npm -= piece_values[captured_piece_type]
 
                 # Update bishop pair bonus if bishop captured
-                if captured_piece_type == chess.BISHOP and chess_board.pieces_mask(captured_piece_type, captured_piece_color).bit_count() == 2:
+                if captured_piece_type == chess.BISHOP and chess_board.pieces_mask(captured_piece_type, not piece_color).bit_count() == 2:
                     self.material -= -color_multiplier * BISHOP_PAIR_BONUS # If 2 bishops before, remove bonus
 
-            if captured_piece_color: # Flip squares for white
+            if not piece_color: # Flip squares for white
                 to_square = flip[to_square]
 
             # Remove captured piece from material and position scores
@@ -134,9 +132,9 @@ class Score: # Positive values favor white, negative values favor black
             self.mg -= -color_multiplier * mg_tables[captured_piece_type][to_square]
             self.eg -= -color_multiplier * eg_tables[captured_piece_type][to_square]
 
-    def initialize_scores(self, chess_board: chess.Board):
+    def initialize_scores(self, chess_board: chess.Board) -> None:
         """
-        Initialize values for starting position.
+        Initialize values for starting position (works with custom starting FENs).
         Calculates material score, npm score, and evaluates piece positions.
         Evaluates piece positions using PSQT with interpolation between middlegame and endgame.
         Runs only once so not optimized for clarity.
@@ -149,36 +147,43 @@ class Score: # Positive values favor white, negative values favor black
         white_bishop_count = 0
         black_bishop_count = 0
 
+        # Cache tables for faster lookups
+        piece_values = PIECE_VALUES_STOCKFISH
         mg_tables = PSQT[MIDGAME]
         eg_tables = PSQT[ENDGAME]
+        flip = FLIP
+        bishop_bonus = BISHOP_PAIR_BONUS
 
         # Evaluate each piece type
         for square in chess.SQUARES:
-            piece = chess_board.piece_at(square)
-            if piece:
+            piece_type = chess_board.piece_type_at(square)
+            if piece_type:
+                piece_color = chess_board.color_at(square)
+
                 # Update npm score
-                if piece.piece_type != chess.PAWN and piece.piece_type != chess.KING:
-                    self.npm += PIECE_VALUES_STOCKFISH[piece.piece_type]
+                if piece_type != chess.PAWN and piece_type != chess.KING:
+                    self.npm += piece_values[piece_type]
 
                 # Update material and position scores
-                if piece.color: # White piece
-                    self.material += PIECE_VALUES_STOCKFISH[piece.piece_type]
-                    self.mg += mg_tables[piece.piece_type][FLIP[square]]
-                    self.eg += eg_tables[piece.piece_type][FLIP[square]]
-                    if piece.piece_type == chess.BISHOP:
+                if piece_color: # White piece
+                    self.material += piece_values[piece_type]
+                    self.mg += mg_tables[piece_type][flip[square]]
+                    self.eg += eg_tables[piece_type][flip[square]]
+                    if piece_type == chess.BISHOP:
                         white_bishop_count += 1
                 else: # Black piece
-                    self.material -= PIECE_VALUES_STOCKFISH[piece.piece_type]
-                    self.mg -= mg_tables[piece.piece_type][square]
-                    self.eg -= eg_tables[piece.piece_type][square]
-                    if piece.piece_type == chess.BISHOP:
+                    self.material -= piece_values[piece_type]
+                    self.mg -= mg_tables[piece_type][square]
+                    self.eg -= eg_tables[piece_type][square]
+                    if piece_type == chess.BISHOP:
                         black_bishop_count += 1
 
         # Bishop pair bonus worth half a pawn
         if white_bishop_count >= 2:
-            self.material += BISHOP_PAIR_BONUS
+            self.material += bishop_bonus
         if black_bishop_count >= 2:
-            self.material -= BISHOP_PAIR_BONUS
+            self.material -= bishop_bonus
+
 
 class ChessBot:
     __slots__ = ["game", "moves_checked", "transposition_table"]  # Optimization for fast lookups
@@ -238,7 +243,7 @@ class ChessBot:
                 score = 0
 
                 # Capturing a piece bonus (MVV/LVA - Most Valuable Victim/Least Valuable Attacker)
-                if chess_board.is_capture(move):
+                if chess_board.is_capture(move): # TODO use piece_type_at instead of piece_at for performance
                     victim = chess_board.piece_at(move.to_square)
                     attacker = chess_board.piece_at(move.from_square)
 
