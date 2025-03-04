@@ -188,7 +188,7 @@ class Score: # Positive values favor white, negative values favor black
 class ChessBot:
     __slots__ = ["game", "moves_checked", "transposition_table"]  # Optimization for fast lookups
 
-    def __init__(self, game):
+    def __init__(self, game) -> None:
         self.game: "ChessGame" = game
         self.moves_checked: int = 0
 
@@ -196,12 +196,12 @@ class ChessBot:
         tt_entry_size = getsizeof(TTEntry(0, 0, EXACT, chess.Move.from_uci("e2e4")))
         self.transposition_table = LRU(int(TT_SIZE * 1024 * 1024 / tt_entry_size))  # Initialize TT with size in MB
 
-    def display_checking_move_arrow(self, move):
+    def display_checking_move_arrow(self, move) -> None:
         """Display an arrow on the board for the move being checked."""
         self.game.checking_move = move
         self.game.display_board(self.game.last_move)  # Update display
 
-    def evaluate_position(self, chess_board: chess.Board, score: Score, tt_entry=None, has_legal_moves=True) -> float:
+    def evaluate_position(self, chess_board: chess.Board, score: Score, tt_entry=None, has_legal_moves=True):
         """
         Evaluate the current position.
         Positive values favor white, negative values favor black.
@@ -236,6 +236,11 @@ class ChessBot:
         if tt_move:
             yield tt_move
 
+        # Cache tables for faster lookups
+        piece_values = PIECE_VALUES_STOCKFISH
+
+        color_multiplier = 1 if chess_board.turn else -1
+
         # Sort remaining moves
         ordered_moves = []
         for move in chess_board.legal_moves:
@@ -243,21 +248,22 @@ class ChessBot:
                 score = 0
 
                 # Capturing a piece bonus (MVV/LVA - Most Valuable Victim/Least Valuable Attacker)
-                if chess_board.is_capture(move): # TODO use piece_type_at instead of piece_at for performance
-                    victim = chess_board.piece_at(move.to_square)
-                    attacker = chess_board.piece_at(move.from_square)
+                if chess_board.is_capture(move):
+                    victim_piece_type = chess_board.piece_type_at(move.to_square)
+                    attacker_piece_type = chess_board.piece_type_at(move.from_square)
 
                     # Handle en passant captures
-                    if victim is None and move.to_square == chess_board.ep_square:
-                        victim = chess_board.piece_at(move.to_square + (-8 if attacker.color else 8))
+                    if not victim_piece_type and attacker_piece_type == chess.PAWN: # Implied en passant capture since no piece at to_square and pawn moving
+                        victim_piece_type = chess_board.piece_type_at(move.to_square - (color_multiplier * 8))
                         score += 5 # Small bonus for en passant captures
 
-                    if victim and attacker:
+                    # Capture
+                    if victim_piece_type and attacker_piece_type:
                         # Prioritize capturing higher value pieces using lower value pieces
-                        score += 10_000 + PIECE_VALUES_STOCKFISH[victim.piece_type] - PIECE_VALUES_STOCKFISH[attacker.piece_type]
+                        score += 10_000 + piece_values[victim_piece_type] - piece_values[attacker_piece_type]
 
                 if move.promotion: # Promotion bonus
-                    score += 1_000 + PIECE_VALUES_STOCKFISH[move.promotion] - PIECE_VALUES_STOCKFISH[chess.PAWN]
+                    score += 1_000 + piece_values[move.promotion] - piece_values[chess.PAWN]
 
                 # if chess_board.gives_check(move): # Check bonus
                 #     score += 100

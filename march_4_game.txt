@@ -1,0 +1,451 @@
+-------------------
+Player: White - 1
+Moves/Time: 29,502 / 0.93 s = 0.0317 ms/M, 31,554 M/s
+Transposition table: 11,312 entries, 0.6904 MB
+FEN: rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
+Eval: 3, 3
+Move played: g1h3
+-------------------
+Player: Black - 1
+Moves/Time: 26,712 / 0.89 s = 0.0335 ms/M, 29,852 M/s
+Transposition table: 10,403 entries, 0.6349 MB
+FEN: rnbqkbnr/pppppppp/8/8/8/7N/PPPPPPPP/RNBQKB1R b KQkq - 1 1
+Eval: 0, 0
+Move played: g8h6
+-------------------
+Player: White - 2
+Moves/Time: 20,772 / 0.69 s = 0.0331 ms/M, 30,246 M/s
+Transposition table: 18,075 entries, 1.1032 MB
+FEN: rnbqkb1r/pppppppp/7n/8/8/7N/PPPPPPPP/RNBQKB1R w KQkq - 2 2
+Eval: 31, 31
+Move played: e2e4
+-------------------
+Player: Black - 2
+Moves/Time: 34,909 / 0.65 s = 0.0188 ms/M, 53,318 M/s
+Transposition table: 11,538 entries, 0.7042 MB
+FEN: rnbqkb1r/pppppppp/7n/8/4P3/7N/PPPP1PPP/RNBQKB1R b KQkq - 0 2
+Eval: 42, 42
+Move played: h8g8
+-------------------
+Player: White - 3
+Moves/Time: 33,432 / 1.11 s = 0.0333 ms/M, 30,008 M/s
+Transposition table: 29,916 entries, 1.8259 MB
+FEN: rnbqkbr1/pppppppp/7n/8/4P3/7N/PPPP1PPP/RNBQKB1R w KQq - 1 3
+Eval: 67, 67
+Move played: f1c4
+-------------------
+Player: Black - 3
+Moves/Time: 12,453 / 0.40 s = 0.0325 ms/M, 30,786 M/s
+Transposition table: 14,990 entries, 0.9149 MB
+FEN: rnbqkbr1/pppppppp/7n/8/2B1P3/7N/PPPP1PPP/RNBQK2R b KQq - 2 3
+Eval: 49, 49
+Move played: e7e6
+-------------------
+Player: White - 4
+Moves/Time: 89,517 / 2.63 s = 0.0294 ms/M, 34,056 M/s
+Transposition table: 50,576 entries, 3.0869 MB
+FEN: rnbqkbr1/pppp1ppp/4p2n/8/2B1P3/7N/PPPP1PPP/RNBQK2R w KQq - 0 4
+Eval: 65, 65
+Move played: c2c3
+-------------------
+Player: Black - 4
+Moves/Time: 62,168 / 1.74 s = 0.0280 ms/M, 35,708 M/s
+Transposition table: 28,374 entries, 1.7318 MB
+FEN: rnbqkbr1/pppp1ppp/4p2n/8/2B1P3/2P4N/PP1P1PPP/RNBQK2R b KQq - 0 4
+Eval: 48, 48
+Move played: f8b4
+-------------------
+Player: White - 5
+Moves/Time: 145,977 / 3.74 s = 0.0256 ms/M, 39,070 M/s
+Transposition table: 72,008 entries, 4.3950 MB
+FEN: rnbqk1r1/pppp1ppp/4p2n/8/1bB1P3/2P4N/PP1P1PPP/RNBQK2R w KQq - 1 5
+Eval: 981, 981
+Move played: c3b4
+-------------------
+Player: Black - 5
+Moves/Time: 59,311 / 1.12 s = 0.0188 ms/M, 53,134 M/s
+Transposition table: 29,479 entries, 1.7993 MB
+FEN: rnbqk1r1/pppp1ppp/4p2n/8/1PB1P3/7N/PP1P1PPP/RNBQK2R b KQq - 0 5
+Eval: 985, 985
+Move played: d8f6
+-------------------
+Player: White - 6
+Moves/Time: 35,473 / 1.57 s = 0.0443 ms/M, 22,557 M/s
+Transposition table: 87,674 entries, 5.3512 MB
+FEN: rnb1k1r1/pppp1ppp/4pq1n/8/1PB1P3/7N/PP1P1PPP/RNBQK2R w KQq - 1 6
+Eval: 987, 987
+Move played: c4d3
+-------------------
+Player: Black - 6
+Moves/Time: 60,018 / 1.18 s = 0.0196 ms/M, 51,036 M/s
+Transposition table: 31,824 entries, 1.9424 MB
+FEN: rnb1k1r1/pppp1ppp/4pq1n/8/1P2P3/3B3N/PP1P1PPP/RNBQK2R b KQq - 2 6
+Eval: 818, 818
+Move played: f6b2
+-------------------
+Player: White - 7
+Moves/Time: 60,890 / 2.27 s = 0.0372 ms/M, 26,860 M/s
+Transposition table: 110,816 entries, 6.7637 MB
+FEN: rnb1k1r1/pppp1ppp/4p2n/8/1P2P3/3B3N/Pq1P1PPP/RNBQK2R w KQq - 0 7
+Eval: 3323, 3323
+Move played: c1b2
+-------------------
+Player: Black - 7
+Moves/Time: 60,844 / 1.21 s = 0.0198 ms/M, 50,395 M/s
+Transposition table: 34,938 entries, 2.1324 MB
+FEN: rnb1k1r1/pppp1ppp/4p2n/8/1P2P3/3B3N/PB1P1PPP/RN1QK2R b KQq - 0 7
+Eval: 3319, 3319
+Move played: g8h8
+-------------------
+Player: White - 8
+Moves/Time: 77,256 / 2.56 s = 0.0331 ms/M, 30,173 M/s
+Transposition table: 132,624 entries, 8.0947 MB
+FEN: rnb1k2r/pppp1ppp/4p2n/8/1P2P3/3B3N/PB1P1PPP/RN1QK2R w KQq - 1 8
+Eval: 3355, 3355
+Move played: h3f4
+-------------------
+Player: Black - 8
+Moves/Time: 173,964 / 3.20 s = 0.0184 ms/M, 54,446 M/s
+Transposition table: 39,851 entries, 2.4323 MB
+FEN: rnb1k2r/pppp1ppp/4p2n/8/1P2PN2/3B4/PB1P1PPP/RN1QK2R b KQq - 2 8
+Eval: 3355, 3355
+Move played: b7b5
+-------------------
+Player: White - 9
+Moves/Time: 205,826 / 5.53 s = 0.0269 ms/M, 37,196 M/s
+Transposition table: 166,981 entries, 10.1917 MB
+FEN: rnb1k2r/p1pp1ppp/4p2n/1p6/1P2PN2/3B4/PB1P1PPP/RN1QK2R w KQq - 0 9
+Eval: 3359, 3359
+Move played: d1e2
+-------------------
+Player: Black - 9
+Moves/Time: 94,100 / 1.79 s = 0.0190 ms/M, 52,500 M/s
+Transposition table: 41,441 entries, 2.5294 MB
+FEN: rnb1k2r/p1pp1ppp/4p2n/1p6/1P2PN2/3B4/PB1PQPPP/RN2K2R b KQq - 1 9
+Eval: 3363, 3363
+Move played: h8g8
+-------------------
+Player: White - 10
+Moves/Time: 111,699 / 3.06 s = 0.0274 ms/M, 36,547 M/s
+Transposition table: 185,568 entries, 11.3262 MB
+FEN: rnb1k1r1/p1pp1ppp/4p2n/1p6/1P2PN2/3B4/PB1PQPPP/RN2K2R w KQq - 2 10
+Eval: 3358, 3358
+Move played: f4h5
+-------------------
+Player: Black - 10
+Moves/Time: 51,762 / 0.96 s = 0.0185 ms/M, 54,007 M/s
+Transposition table: 43,347 entries, 2.6457 MB
+FEN: rnb1k1r1/p1pp1ppp/4p2n/1p5N/1P2P3/3B4/PB1PQPPP/RN2K2R b KQq - 3 10
+Eval: 3354, 3354
+Move played: g8h8
+-------------------
+Player: White - 11
+Moves/Time: 82,209 / 2.61 s = 0.0317 ms/M, 31,552 M/s
+Transposition table: 206,226 entries, 12.5870 MB
+FEN: rnb1k2r/p1pp1ppp/4p2n/1p5N/1P2P3/3B4/PB1PQPPP/RN2K2R w KQq - 4 11
+Eval: 3356, 3356
+Move played: e2f3
+-------------------
+Player: Black - 11
+Moves/Time: 25,568 / 0.87 s = 0.0340 ms/M, 29,371 M/s
+Transposition table: 54,916 entries, 3.3518 MB
+FEN: rnb1k2r/p1pp1ppp/4p2n/1p5N/1P2P3/3B1Q2/PB1P1PPP/RN2K2R b KQq - 5 11
+Eval: 3329, 3329
+Move played: h8f8
+-------------------
+Player: White - 12
+Moves/Time: 81,362 / 2.62 s = 0.0322 ms/M, 31,083 M/s
+Transposition table: 224,517 entries, 13.7034 MB
+FEN: rnb1kr2/p1pp1ppp/4p2n/1p5N/1P2P3/3B1Q2/PB1P1PPP/RN2K2R w KQq - 6 12
+Eval: 3322, 3322
+Move played: f3e3
+-------------------
+Player: Black - 12
+Moves/Time: 37,969 / 0.74 s = 0.0195 ms/M, 51,258 M/s
+Transposition table: 57,145 entries, 3.4879 MB
+FEN: rnb1kr2/p1pp1ppp/4p2n/1p5N/1P2P3/3BQ3/PB1P1PPP/RN2K2R b KQq - 7 12
+Eval: 3349, 3349
+Move played: f8h8
+-------------------
+Player: White - 13
+Moves/Time: 138,350 / 4.08 s = 0.0295 ms/M, 33,875 M/s
+Transposition table: 251,015 entries, 15.3207 MB
+FEN: rnb1k2r/p1pp1ppp/4p2n/1p5N/1P2P3/3BQ3/PB1P1PPP/RN2K2R w KQq - 8 13
+Eval: 3354, 3354
+Move played: h5f4
+-------------------
+Player: Black - 13
+Moves/Time: 29,576 / 0.89 s = 0.0300 ms/M, 33,355 M/s
+Transposition table: 65,754 entries, 4.0133 MB
+FEN: rnb1k2r/p1pp1ppp/4p2n/1p6/1P2PN2/3BQ3/PB1P1PPP/RN2K2R b KQq - 9 13
+Eval: 3321, 3321
+Move played: h6g4
+-------------------
+Player: White - 14
+Moves/Time: 54,929 / 1.43 s = 0.0260 ms/M, 38,459 M/s
+Transposition table: 259,386 entries, 15.8317 MB
+FEN: rnb1k2r/p1pp1ppp/4p3/1p6/1P2PNn1/3BQ3/PB1P1PPP/RN2K2R w KQq - 10 14
+Eval: 3316, 3316
+Move played: f4h5
+-------------------
+Player: Black - 14
+Moves/Time: 13,232 / 0.38 s = 0.0286 ms/M, 34,965 M/s
+Transposition table: 69,468 entries, 4.2400 MB
+FEN: rnb1k2r/p1pp1ppp/4p3/1p5N/1P2P1n1/3BQ3/PB1P1PPP/RN2K2R b KQq - 11 14
+Eval: 725, 725
+Move played: g4e3
+-------------------
+Player: White - 15
+Moves/Time: 58,702 / 1.55 s = 0.0264 ms/M, 37,821 M/s
+Transposition table: 267,082 entries, 16.3014 MB
+FEN: rnb1k2r/p1pp1ppp/4p3/1p5N/1P2P3/3Bn3/PB1P1PPP/RN2K2R w KQq - 0 15
+Eval: 946, 946
+Move played: h5g7
+-------------------
+Player: Black - 15
+Moves/Time: 5,379 / 0.17 s = 0.0322 ms/M, 31,086 M/s
+Transposition table: 71,316 entries, 4.3528 MB
+FEN: rnb1k2r/p1pp1pNp/4p3/1p6/1P2P3/3Bn3/PB1P1PPP/RN2K2R b KQq - 0 15
+Eval: 964, 964
+Move played: e8f8
+-------------------
+Player: White - 16
+Moves/Time: 92,077 / 2.10 s = 0.0228 ms/M, 43,842 M/s
+Transposition table: 276,663 entries, 16.8862 MB
+FEN: rnb2k1r/p1pp1pNp/4p3/1p6/1P2P3/3Bn3/PB1P1PPP/RN2K2R w KQ - 1 16
+Eval: 1231, 1231
+Move played: g7e6
+-------------------
+Player: Black - 16
+Moves/Time: 28,498 / 0.51 s = 0.0179 ms/M, 55,964 M/s
+Transposition table: 71,844 entries, 4.3850 MB
+FEN: rnb2k1r/p1pp1p1p/4N3/1p6/1P2P3/3Bn3/PB1P1PPP/RN2K2R b KQ - 0 16
+Eval: 382, 382
+Move played: d7e6
+-------------------
+Player: White - 17
+Moves/Time: 55,894 / 1.59 s = 0.0285 ms/M, 35,068 M/s
+Transposition table: 288,772 entries, 17.6252 MB
+FEN: rnb2k1r/p1p2p1p/4p3/1p6/1P2P3/3Bn3/PB1P1PPP/RN2K2R w KQ - 0 17
+Eval: 389, 389
+Move played: b2g7
+-------------------
+Player: Black - 17
+Moves/Time: 6,146 / 0.21 s = 0.0342 ms/M, 29,225 M/s
+Transposition table: 74,759 entries, 4.5629 MB
+FEN: rnb2k1r/p1p2pBp/4p3/1p6/1P2P3/3Bn3/P2P1PPP/RN2K2R b KQ - 1 17
+Eval: 362, 362
+Move played: f8g8
+-------------------
+Player: White - 18
+Moves/Time: 45,303 / 1.41 s = 0.0310 ms/M, 32,210 M/s
+Transposition table: 299,629 entries, 18.2879 MB
+FEN: rnb3kr/p1p2pBp/4p3/1p6/1P2P3/3Bn3/P2P1PPP/RN2K2R w KQ - 2 18
+Eval: 346, 346
+Move played: g2g4
+-------------------
+Player: Black - 18
+Moves/Time: 14,693 / 0.37 s = 0.0253 ms/M, 39,578 M/s
+Transposition table: 78,396 entries, 4.7849 MB
+FEN: rnb3kr/p1p2pBp/4p3/1p6/1P2P1P1/3Bn3/P2P1P1P/RN2K2R b KQ - 0 18
+Eval: 167, 167
+Move played: e3g4
+-------------------
+Player: White - 19
+Moves/Time: 62,441 / 2.37 s = 0.0380 ms/M, 26,322 M/s
+Transposition table: 325,077 entries, 19.8411 MB
+FEN: rnb3kr/p1p2pBp/4p3/1p6/1P2P1n1/3B4/P2P1P1P/RN2K2R w KQ - 0 19
+Eval: 371, 371
+Move played: d3b5
+-------------------
+Player: Black - 19
+Moves/Time: 41,146 / 1.47 s = 0.0357 ms/M, 27,988 M/s
+Transposition table: 95,027 entries, 5.8000 MB
+FEN: rnb3kr/p1p2pBp/4p3/1B6/1P2P1n1/8/P2P1P1P/RN2K2R b KQ - 0 19
+Eval: 224, 224
+Move played: g4h2
+-------------------
+Player: White - 20
+Moves/Time: 47,615 / 1.86 s = 0.0391 ms/M, 25,552 M/s
+Transposition table: 345,239 entries, 21.0717 MB
+FEN: rnb3kr/p1p2pBp/4p3/1B6/1P2P3/8/P2P1P1n/RN2K2R w KQ - 0 20
+Eval: 215, 215
+Move played: g7h6
+-------------------
+Player: Black - 20
+Moves/Time: 19,436 / 0.63 s = 0.0322 ms/M, 31,049 M/s
+Transposition table: 103,760 entries, 6.3330 MB
+FEN: rnb3kr/p1p2p1p/4p2B/1B6/1P2P3/8/P2P1P1n/RN2K2R b KQ - 1 20
+Eval: 111, 111
+Move played: h2f3
+-------------------
+Player: White - 21
+Moves/Time: 2,759 / 0.12 s = 0.0422 ms/M, 23,697 M/s
+Transposition table: 346,492 entries, 21.1482 MB
+FEN: rnb3kr/p1p2p1p/4p2B/1B6/1P2P3/5n2/P2P1P2/RN2K2R w KQ - 2 21
+Eval: 98, 98
+Move played: e1e2
+-------------------
+Player: Black - 21
+Moves/Time: 111,656 / 3.74 s = 0.0335 ms/M, 29,866 M/s
+Transposition table: 151,859 entries, 9.2687 MB
+FEN: rnb3kr/p1p2p1p/4p2B/1B6/1P2P3/5n2/P2PKP2/RN5R b - - 3 21
+Eval: 130, 130
+Move played: f3d4
+-------------------
+Player: White - 22
+Moves/Time: 5,998 / 0.23 s = 0.0392 ms/M, 25,526 M/s
+Transposition table: 349,270 entries, 21.3177 MB
+FEN: rnb3kr/p1p2p1p/4p2B/1B6/1P1nP3/8/P2PKP2/RN5R w - - 4 22
+Eval: 144, 144
+Move played: e2e1
+-------------------
+Player: Black - 22
+Moves/Time: 69,552 / 2.41 s = 0.0346 ms/M, 28,906 M/s
+Transposition table: 180,876 entries, 11.0398 MB
+FEN: rnb3kr/p1p2p1p/4p2B/1B6/1P1nP3/8/P2P1P2/RN2K2R b - - 5 22
+Eval: 166, 166
+Move played: d4f5
+-------------------
+Player: White - 23
+Moves/Time: 32,761 / 1.07 s = 0.0326 ms/M, 30,659 M/s
+Transposition table: 359,195 entries, 21.9235 MB
+FEN: rnb3kr/p1p2p1p/4p2B/1B3n2/1P2P3/8/P2P1P2/RN2K2R w - - 6 23
+Eval: 169, 169
+Move played: h1g1
+-------------------
+Player: Black - 23
+Moves/Time: 3,012 / 0.10 s = 0.0318 ms/M, 31,473 M/s
+Transposition table: 182,148 entries, 11.1174 MB
+FEN: rnb3kr/p1p2p1p/4p2B/1B3n2/1P2P3/8/P2P1P2/RN2K1R1 b - - 7 23
+Eval: 205, 205
+Move played: f5g7
+-------------------
+Player: White - 24
+Moves/Time: 31,776 / 0.67 s = 0.0211 ms/M, 47,388 M/s
+Transposition table: 360,943 entries, 22.0302 MB
+FEN: rnb3kr/p1p2pnp/4p2B/1B6/1P2P3/8/P2P1P2/RN2K1R1 w - - 8 24
+Eval: 1007, 1007
+Move played: g1g7
+-------------------
+Player: Black - 24
+Moves/Time: 2,127 / 0.07 s = 0.0311 ms/M, 32,137 M/s
+Transposition table: 183,050 entries, 11.1725 MB
+FEN: rnb3kr/p1p2pRp/4p2B/1B6/1P2P3/8/P2P1P2/RN2K3 b - - 0 24
+Eval: 1031, 1031
+Move played: g8f8
+-------------------
+Player: White - 25
+Moves/Time: 33,322 / 1.22 s = 0.0365 ms/M, 27,416 M/s
+Transposition table: 374,416 entries, 22.8525 MB
+FEN: rnb2k1r/p1p2pRp/4p2B/1B6/1P2P3/8/P2P1P2/RN2K3 w - - 1 25
+Eval: 1044, 1044
+Move played: g7g6
+-------------------
+Player: Black - 25
+Moves/Time: 14,442 / 0.27 s = 0.0190 ms/M, 52,658 M/s
+Transposition table: 183,593 entries, 11.2056 MB
+FEN: rnb2k1r/p1p2p1p/4p1RB/1B6/1P2P3/8/P2P1P2/RN2K3 b - - 2 25
+Eval: 1039, 1039
+Move played: f8e7
+-------------------
+Player: White - 26
+Moves/Time: 38,143 / 1.24 s = 0.0326 ms/M, 30,719 M/s
+Transposition table: 389,126 entries, 23.7504 MB
+FEN: rnb4r/p1p1kp1p/4p1RB/1B6/1P2P3/8/P2P1P2/RN2K3 w - - 3 26
+Eval: 1026, 1026
+Move played: g6g7
+-------------------
+Player: Black - 26
+Moves/Time: 29,829 / 0.57 s = 0.0190 ms/M, 52,740 M/s
+Transposition table: 184,219 entries, 11.2438 MB
+FEN: rnb4r/p1p1kpRp/4p2B/1B6/1P2P3/8/P2P1P2/RN2K3 b - - 4 26
+Eval: 1031, 1031
+Move played: e7f8
+-------------------
+Player: White - 27
+Moves/Time: 0 / 0.00 s = 0.0000 ms/M, 0 M/s
+Transposition table: 389,126 entries, 23.7504 MB
+FEN: rnb2k1r/p1p2pRp/4p2B/1B6/1P2P3/8/P2P1P2/RN2K3 w - - 5 27
+Eval: 1044, 1044
+Move played: g7g6
+-------------------
+Player: Black - 27
+Moves/Time: 1 / 0.00 s = 0.1536 ms/M, 6,512 M/s
+Transposition table: 184,219 entries, 11.2438 MB
+FEN: rnb2k1r/p1p2p1p/4p1RB/1B6/1P2P3/8/P2P1P2/RN2K3 b - - 6 27
+Eval: 1039, 1039
+Move played: f8e7
+-------------------
+Player: White - 28
+Moves/Time: 0 / 0.00 s = 0.0000 ms/M, 0 M/s
+Transposition table: 389,126 entries, 23.7504 MB
+FEN: rnb4r/p1p1kp1p/4p1RB/1B6/1P2P3/8/P2P1P2/RN2K3 w - - 7 28
+Eval: 1026, 1026
+Move played: g6g7
+-------------------
+Player: Black - 28
+Moves/Time: 19 / 0.00 s = 0.0186 ms/M, 53,676 M/s
+Transposition table: 184,219 entries, 11.2438 MB
+FEN: rnb4r/p1p1kpRp/4p2B/1B6/1P2P3/8/P2P1P2/RN2K3 b - - 8 28
+Eval: 1031, 1031
+Move played: e7f8
+-------------------
+Player: White - 29
+Moves/Time: 0 / 0.00 s = 0.0000 ms/M, 0 M/s
+Transposition table: 389,126 entries, 23.7504 MB
+FEN: rnb2k1r/p1p2pRp/4p2B/1B6/1P2P3/8/P2P1P2/RN2K3 w - - 9 29
+Eval: 1044, 1044
+Move played: g7g6
+-------------------
+Player: Black - 29
+Moves/Time: 1 / 0.00 s = 0.1536 ms/M, 6,509 M/s
+Transposition table: 184,219 entries, 11.2438 MB
+FEN: rnb2k1r/p1p2p1p/4p1RB/1B6/1P2P3/8/P2P1P2/RN2K3 b - - 10 29
+Eval: 1039, 1039
+Move played: f8e7
+-------------------
+Player: White - 30
+Moves/Time: 0 / 0.00 s = 0.0000 ms/M, 0 M/s
+Transposition table: 389,126 entries, 23.7504 MB
+FEN: rnb4r/p1p1kp1p/4p1RB/1B6/1P2P3/8/P2P1P2/RN2K3 w - - 11 30
+Eval: 1026, 1026
+Move played: g6g7
+-------------------
+Player: Black - 30
+Moves/Time: 19 / 0.00 s = 0.0310 ms/M, 32,238 M/s
+Transposition table: 184,219 entries, 11.2438 MB
+FEN: rnb4r/p1p1kpRp/4p2B/1B6/1P2P3/8/P2P1P2/RN2K3 b - - 12 30
+Eval: 1031, 1031
+Move played: e7f8
+-------------------
+Player: White - 31
+Moves/Time: 0 / 0.00 s = 0.0000 ms/M, 0 M/s
+Transposition table: 389,126 entries, 23.7504 MB
+FEN: rnb2k1r/p1p2pRp/4p2B/1B6/1P2P3/8/P2P1P2/RN2K3 w - - 13 31
+Eval: 1044, 1044
+Move played: g7g6
+-------------------
+Player: Black - 31
+Moves/Time: 1 / 0.00 s = 0.1400 ms/M, 7,144 M/s
+Transposition table: 184,219 entries, 11.2438 MB
+FEN: rnb2k1r/p1p2p1p/4p1RB/1B6/1P2P3/8/P2P1P2/RN2K3 b - - 14 31
+Eval: 1039, 1039
+Move played: f8e7
+-------------------
+Player: White - 32
+Moves/Time: 0 / 0.00 s = 0.0000 ms/M, 0 M/s
+Transposition table: 389,126 entries, 23.7504 MB
+FEN: rnb4r/p1p1kp1p/4p1RB/1B6/1P2P3/8/P2P1P2/RN2K3 w - - 15 32
+Eval: 1026, 1026
+Move played: g6g7
+-------------------
+Player: Black - 32
+Moves/Time: 19 / 0.00 s = 0.0272 ms/M, 36,759 M/s
+Transposition table: 184,219 entries, 11.2438 MB
+FEN: rnb4r/p1p1kpRp/4p2B/1B6/1P2P3/8/P2P1P2/RN2K3 b - - 16 32
+Eval: 1031, 1031
+Move played: e7f8
+-------------------
+Number of turns: 33
+Game Over! Result: Outcome(termination=<Termination.FIVEFOLD_REPETITION: 5>, winner=None)
