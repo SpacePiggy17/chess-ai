@@ -378,11 +378,12 @@ class ChessBot:
         color_multipier = 1 if maximizing_player else -1
 
         original_score = self.game.score
-        best_move = ordered_moves[0]
         better_count = 0
         while beta - alpha >= 2 and better_count != 1:
             test = self.next_guess(alpha, beta, subtree_count)
+
             better_count = 0
+            better = []
             for move in ordered_moves:
                 self.moves_checked += 1
                 if CHECKING_MOVE_ARROW and DEPTH >= RENDER_DEPTH:
@@ -391,11 +392,12 @@ class ChessBot:
                 score = original_score.updated(chess_board, move)
 
                 chess_board.push(move)
-                best_value = -self.alpha_beta(chess_board, DEPTH - 1, -test, -(test-1), not maximizing_player, score)[0]
+                best_value = self.alpha_beta(chess_board, DEPTH - 1, -test, -(test-1), not maximizing_player, score)[0]
                 chess_board.pop()
 
-                if -color_multipier * best_value >= test:
+                if color_multipier * best_value >= test:
                     better_count += 1
+                    better.append(move)
                     best_move = move
 
             # Update alpha-beta range
@@ -403,8 +405,9 @@ class ChessBot:
                 alpha = test
 
                 # # Update number of sub-trees that exceeds seperation test value
-                # if subtree_count != better_count:
-                #     subtree_count -= better_count
+                if subtree_count != better_count:
+                    subtree_count = better_count
+                    ordered_moves = better
             else:
                 beta = test
                 
