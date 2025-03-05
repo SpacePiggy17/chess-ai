@@ -6,6 +6,9 @@ from typing_extensions import TypeAlias  # For GameStage
 STARTING_FEN: str = None
 # STARTING_FEN: str = "2kr1r2/p1p2p1p/4N1p1/1p2B3/5R2/1B4P1/P1P3KP/2q5 b - - 0 26" # Checkmate soon
 
+# STARTING_FEN: str = "r1b1k2r/pppp1p1p/4p1pB/4P3/3q4/6P1/PPP2K1P/RN3BNR w kq - 0 13"
+# STARTING_FEN: str = "r1b1k2r/pppp1p1p/4p1pB/4P3/8/6P1/PqP3KP/RN3BNR w kq - 0 14" # Big jump in evaluation
+
 # Board and piece settings
 PIECE_VALUES: dict[int, int] = {
     chess.PAWN: 100,

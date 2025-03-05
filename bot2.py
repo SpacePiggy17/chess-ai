@@ -22,8 +22,8 @@ from timeit import default_timer # For debugging timing
 # Transposition table entry flags
 Flag: TypeAlias = np.int8
 EXACT: Flag = 1
-UPPERBOUND: Flag = 2 # Alhpa (fail-low)
-LOWERBOUND: Flag = 3 # Beta (fail-high)
+LOWERBOUND: Flag = 2 # Beta (fail-high)
+UPPERBOUND: Flag = 3 # Alpha (fail-low)
 
 # Transposition table entry
 @dataclass
@@ -284,6 +284,13 @@ class ChessBot:
 
 
     def alpha_beta(self, chess_board: chess.Board, depth: np.int8, alpha, beta, maximizing_player: bool, score: Score):
+        """
+        Fail-soft alpha-beta search with transposition table.
+        Scores are incrementally updated based on the move.
+        Returns the best value and move for the current player.
+        """
+        original_alpha, original_beta = alpha, beta
+
         # Lookup position in transposition table
         key = chess_board._transposition_key() # ? Much faster
         # key = zobrist_hash(chess_board) # ! REALLY SLOW (probably because it is not incremental)
@@ -291,7 +298,14 @@ class ChessBot:
 
         # If position is in transposition table and depth is sufficient
         if tt_entry and tt_entry.depth >= depth:
-            if (tt_entry.flag == EXACT) or (tt_entry.flag == LOWERBOUND and tt_entry.value >= beta) or (tt_entry.flag == UPPERBOUND and tt_entry.value <= alpha):
+            if tt_entry.flag == EXACT:
+                return tt_entry.value, tt_entry.best_move
+            elif tt_entry.flag == LOWERBOUND:
+                alpha = max(alpha, tt_entry.value)
+            elif tt_entry.flag == UPPERBOUND:
+                beta = min(beta, tt_entry.value)
+
+            if alpha >= beta:
                 return tt_entry.value, tt_entry.best_move
 
         # Terminal node check
@@ -299,63 +313,60 @@ class ChessBot:
             return self.evaluate_position(chess_board, score, tt_entry), None
 
         tt_move = tt_entry.best_move if tt_entry else None
-        original_alpha = alpha
         best_move = None
         if maximizing_player:
-            original_score = score
             best_value = MIN_VALUE
             for move in self.ordered_moves_generator(chess_board, tt_move):
                 self.moves_checked += 1
                 if CHECKING_MOVE_ARROW and depth >= RENDER_DEPTH:  # Display the root move
                     self.display_checking_move_arrow(move)
 
-                score = original_score.updated(chess_board, move)
+                updated_score = score.updated(chess_board, move)
 
                 chess_board.push(move)
-                value = self.alpha_beta(chess_board, depth - 1, alpha, beta, False, score)[0]
+                value = self.alpha_beta(chess_board, depth - 1, alpha, beta, False, updated_score)[0]
                 chess_board.pop()
 
-                if value > best_value:
-                    best_value = value
-                    best_move = move
-                alpha = max(alpha, value)
-                if value >= beta:
-                    break  # Beta cutoff
+                if value > best_value: # Get new best value and move
+                    best_value, best_move = value, move
+                    alpha = max(alpha, best_value) # Get new alpha
+                    if best_value >= beta:
+                        break  # Beta cutoff (fail-high: opponent won't allow this position)
 
-        else:  # Minimizing player
-            original_score = score
+        else: # Minimizing player
             best_value = MAX_VALUE
             for move in self.ordered_moves_generator(chess_board, tt_move):
                 self.moves_checked += 1
                 if CHECKING_MOVE_ARROW and depth >= RENDER_DEPTH:  # Display the root move
                     self.display_checking_move_arrow(move)
 
-                score = original_score.updated(chess_board, move)
+                updated_score = score.updated(chess_board, move)
 
                 chess_board.push(move)
-                value = self.alpha_beta(chess_board, depth - 1, alpha, beta, True, score)[0]
+                value = self.alpha_beta(chess_board, depth - 1, alpha, beta, True, updated_score)[0]
                 chess_board.pop()
 
-                if value < best_value:
-                    best_value = value
-                    best_move = move
-                beta = min(beta, value)
-                if value <= alpha:
-                    break  # Alpha cutoff
-
+                if value < best_value: # Get new best value and move
+                    best_value, best_move = value, move
+                    beta = min(beta, best_value) # Get new beta
+                    if best_value <= alpha:
+                        break  # Alpha cutoff (fail-low: other positions are better)
         
-        if best_move is None: # If no legal moves, evaluate position
+        if best_move is None: # If no legal moves, evaluate position (best move is None if loop did iterate through legal moves)
             return self.evaluate_position(chess_board, score, tt_entry, has_legal_moves=False), None
 
         # Store position in transposition table
-        flag = EXACT
         if best_value <= original_alpha:
             flag = UPPERBOUND
-        elif best_value >= beta:
+        elif best_value >= original_beta:
             flag = LOWERBOUND
+        else:
+            flag = EXACT
+
         self.transposition_table[key] = TTEntry(depth, best_value, flag, best_move)
 
         return best_value, best_move
+
 
     # TODO ---------------------------------------------
     # def next_guess(self, alpha, beta, subtree_count):
@@ -372,19 +383,16 @@ class ChessBot:
 
         # Run minimax once with manual timing
         start_time = default_timer()
-
-        temp_score = Score(
-            self.game.score.material,
-            self.game.score.mg,
-            self.game.score.eg,
-            self.game.score.npm)
+        
         best_value, best_move = self.alpha_beta(
             chess_board,
             DEPTH,
             MIN_VALUE,
             MAX_VALUE,
             chess_board.turn,
-            temp_score)
+            self.game.score)
+        
+        print(f"Goal value: {best_value}")
         
         # assert best_move is not None, "No best move returned" # TODO remove when done testing
         if best_move is None:
