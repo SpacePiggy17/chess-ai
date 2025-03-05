@@ -369,11 +369,47 @@ class ChessBot:
 
 
     # TODO ---------------------------------------------
-    # def next_guess(self, alpha, beta, subtree_count):
-    #     return alpha + (beta - alpha) * (subtree_count - 1) / subtree_count
+    def next_guess(self, alpha, beta, subtree_count):
+        return alpha + (beta - alpha) * (subtree_count - 1) / subtree_count
 
-    # def best_node_search(self, chess_board: chess.Board, alpha, beta, maximizing_player: bool):
-    #     return 0
+    def best_node_search(self, chess_board: chess.Board, alpha, beta, maximizing_player: bool):
+        ordered_moves = list(self.ordered_moves_generator(chess_board, None))
+        subtree_count = len(ordered_moves)
+        color_multipier = 1 if maximizing_player else -1
+
+        original_score = self.game.score
+        best_move = ordered_moves[0]
+        better_count = 0
+        while beta - alpha >= 2 and better_count != 1:
+            test = self.next_guess(alpha, beta, subtree_count)
+            better_count = 0
+            for move in ordered_moves:
+                self.moves_checked += 1
+                if CHECKING_MOVE_ARROW and DEPTH >= RENDER_DEPTH:
+                    self.display_checking_move_arrow(move)
+
+                score = original_score.updated(chess_board, move)
+
+                chess_board.push(move)
+                best_value = -self.alpha_beta(chess_board, DEPTH - 1, -test, -(test-1), not maximizing_player, score)[0]
+                chess_board.pop()
+
+                if -color_multipier * best_value >= test:
+                    better_count += 1
+                    best_move = move
+
+            # Update alpha-beta range
+            if better_count > 0:
+                alpha = test
+
+                # # Update number of sub-trees that exceeds seperation test value
+                # if subtree_count != better_count:
+                #     subtree_count -= better_count
+            else:
+                beta = test
+                
+        return best_move
+
 
     def get_move(self, chess_board: chess.Board):
         """
@@ -384,15 +420,16 @@ class ChessBot:
         # Run minimax once with manual timing
         start_time = default_timer()
         
-        best_value, best_move = self.alpha_beta(
-            chess_board,
-            DEPTH,
-            MIN_VALUE,
-            MAX_VALUE,
-            chess_board.turn,
-            self.game.score)
+        # best_value, best_move = self.alpha_beta(
+        #     chess_board,
+        #     DEPTH,
+        #     MIN_VALUE,
+        #     MAX_VALUE,
+        #     chess_board.turn,
+        #     self.game.score)
+        best_move = self.best_node_search(chess_board, MIN_VALUE, MAX_VALUE, chess_board.turn)
         
-        print(f"Goal value: {best_value}")
+        # print(f"Goal value: {best_value}")
         
         # assert best_move is not None, "No best move returned" # TODO remove when done testing
         if best_move is None:
