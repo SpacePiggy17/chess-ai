@@ -305,7 +305,9 @@ class ChessGame:
             interpolated_score = ((actual_score.mg * phase) + (actual_score.eg * (256 - phase))) >> 8
             actual_score = actual_score.material + interpolated_score
 
+            assert cached_score == actual_score, f"Eval: {cached_score}, {actual_score}"
             print(f"Eval: {cached_score}, {actual_score}")
+            
             print(f"Move played: {move}")
             print("-------------------")
             self.last_move = move

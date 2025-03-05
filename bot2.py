@@ -35,7 +35,7 @@ class TTEntry:
     flag: Flag
     best_move: Optional[chess.Move]
 
-# Score class to store scores and update them
+# Score class to initialize and update scores
 @dataclass
 class Score: # Positive values favor white, negative values favor black
     __slots__ = ["material", "mg", "eg", "npm"] # Optimization for faster lookups
@@ -43,13 +43,15 @@ class Score: # Positive values favor white, negative values favor black
     material: np.int16 # Material score
     mg: np.int16 # Midgame score
     eg: np.int16 # Endgame score
-    npm: np.int16 # Non-pawn material (for phase calculation)
+    npm: np.uint16 # Non-pawn material (for phase calculation)
 
-    def update(self, chess_board: chess.Board, move: chess.Move) -> None:
+    def updated(self, chess_board: chess.Board, move: chess.Move) -> None:
         """
-        Updates the material, midgame, endgame, and non-pawn material scores based on the move.
+        Returns the updated material, midgame, endgame, and non-pawn material scores based on the move.
         Much faster than re-evaluating the entire board, even if only the leaf nodes are re-evaluated.
         """
+        material, mg, eg, npm = self.material, self.mg, self.eg, self.npm
+
         from_square = move.from_square
         to_square = move.to_square
         promotion_piece_type: chess.PieceType = move.promotion
@@ -77,8 +79,8 @@ class Score: # Positive values favor white, negative values favor black
                 if piece_color: # Flip rook square for white
                     rook_from, rook_to = flip[rook_from], flip[rook_to]
                 
-                self.mg += color_multiplier * (mg_rook_table[rook_to] - mg_rook_table[rook_from])
-                self.eg += color_multiplier * (eg_rook_table[rook_to] - eg_rook_table[rook_from])
+                mg += color_multiplier * (mg_rook_table[rook_to] - mg_rook_table[rook_from])
+                eg += color_multiplier * (eg_rook_table[rook_to] - eg_rook_table[rook_from])
                 
         # Flip squares for white
         new_from_square, new_to_square = from_square, to_square
@@ -91,21 +93,21 @@ class Score: # Positive values favor white, negative values favor black
             if promotion_piece_type == chess.BISHOP:
                 bishop_count_before = chess_board.pieces_mask(chess.BISHOP, piece_color).bit_count()
                 if bishop_count_before == 1: # If 2 bishops now, add bonus
-                    self.material += color_multiplier * BISHOP_PAIR_BONUS
+                    material += color_multiplier * BISHOP_PAIR_BONUS
 
-            self.npm += piece_values[promotion_piece_type]
-            self.material += color_multiplier * (piece_values[promotion_piece_type] - piece_values[chess.PAWN])
-            self.mg += color_multiplier * (mg_tables[promotion_piece_type][new_to_square] - mg_tables[chess.PAWN][new_from_square])
-            self.eg += color_multiplier * (eg_tables[promotion_piece_type][new_to_square] - eg_tables[chess.PAWN][new_from_square])
+            npm += piece_values[promotion_piece_type]
+            material += color_multiplier * (piece_values[promotion_piece_type] - piece_values[chess.PAWN])
+            mg += color_multiplier * (mg_tables[promotion_piece_type][new_to_square] - mg_tables[chess.PAWN][new_from_square])
+            eg += color_multiplier * (eg_tables[promotion_piece_type][new_to_square] - eg_tables[chess.PAWN][new_from_square])
 
         else: # Normal move
             mg_table = mg_tables[piece_type]
             eg_table = eg_tables[piece_type]
-            self.mg += color_multiplier * (mg_table[new_to_square] - mg_table[new_from_square])
-            self.eg += color_multiplier * (eg_table[new_to_square] - eg_table[new_from_square])
+            mg += color_multiplier * (mg_table[new_to_square] - mg_table[new_from_square])
+            eg += color_multiplier * (eg_table[new_to_square] - eg_table[new_from_square])
 
         if castling: # Done if castling
-            return
+            return Score(material, mg, eg, npm)
         
         # Handle captures
         captured_piece_type = chess_board.piece_type_at(to_square)
@@ -116,21 +118,23 @@ class Score: # Positive values favor white, negative values favor black
             captured_piece_type = chess_board.piece_type_at(from_square)
 
         if captured_piece_type: # Capture
-            if captured_piece_type != chess.PAWN:
+            if captured_piece_type != chess.PAWN: # and captured_piece_type != chess.KING:
                 # Update npm score
-                self.npm -= piece_values[captured_piece_type]
+                npm -= piece_values[captured_piece_type]
 
                 # Update bishop pair bonus if bishop captured
                 if captured_piece_type == chess.BISHOP and chess_board.pieces_mask(captured_piece_type, not piece_color).bit_count() == 2:
-                    self.material -= -color_multiplier * BISHOP_PAIR_BONUS # If 2 bishops before, remove bonus
+                    material -= -color_multiplier * BISHOP_PAIR_BONUS # If 2 bishops before, remove bonus
 
             if not piece_color: # Flip squares for white
                 to_square = flip[to_square]
 
             # Remove captured piece from material and position scores
-            self.material -= -color_multiplier * piece_values[captured_piece_type]
-            self.mg -= -color_multiplier * mg_tables[captured_piece_type][to_square]
-            self.eg -= -color_multiplier * eg_tables[captured_piece_type][to_square]
+            material -= -color_multiplier * piece_values[captured_piece_type]
+            mg -= -color_multiplier * mg_tables[captured_piece_type][to_square]
+            eg -= -color_multiplier * eg_tables[captured_piece_type][to_square]
+
+        return Score(material, mg, eg, npm)
 
     def initialize_scores(self, chess_board: chess.Board) -> None:
         """
@@ -216,15 +220,16 @@ class ChessBot:
         # Evaluate game-ending conditions
         if not has_legal_moves:  # No legal moves
             if chess_board.is_check():  # Checkmate
-                return -10_000 if chess_board.turn else 10_000
+                return -100_000 if chess_board.turn else 100_000
             return 0  # Stalemate
-        elif chess_board.is_insufficient_material():  # Insufficient material for either side to win
+        elif chess_board.is_insufficient_material(): # (semi-slow) Insufficient material for either side to win
             return 0
-        elif chess_board.can_claim_fifty_moves():  # Avoid fifty move rule
+        elif chess_board.can_claim_fifty_moves(): # Avoid fifty move rule
             return 0
 
         # Return score (material + interpolated mg/eg score)
         phase = min(score.npm // NPM_SCALAR, 256) # Phase value between 0 and 256 (0 = endgame, 256 = opening)
+        assert 0 <= phase <= 256, f"Phase value out of bounds: {phase}" # TODO remove when done testing
         interpolated_score = ((int(score.mg) * phase) + (int(score.eg) * (256 - phase))) >> 8 # Int division by 256
         return score.material + interpolated_score
 
@@ -238,7 +243,7 @@ class ChessBot:
 
         # Cache tables for faster lookups
         piece_values = PIECE_VALUES_STOCKFISH
-
+        
         color_multiplier = 1 if chess_board.turn else -1
 
         # Sort remaining moves
@@ -257,10 +262,8 @@ class ChessBot:
                         victim_piece_type = chess_board.piece_type_at(move.to_square - (color_multiplier * 8))
                         score += 5 # Small bonus for en passant captures
 
-                    # Capture
-                    if victim_piece_type and attacker_piece_type:
-                        # Prioritize capturing higher value pieces using lower value pieces
-                        score += 10_000 + piece_values[victim_piece_type] - piece_values[attacker_piece_type]
+                    # Prioritize capturing higher value pieces using lower value pieces
+                    score += 10_000 + piece_values[victim_piece_type] - piece_values[attacker_piece_type]
 
                 if move.promotion: # Promotion bonus
                     score += 1_000 + piece_values[move.promotion] - piece_values[chess.PAWN]
@@ -276,13 +279,14 @@ class ChessBot:
 
         ordered_moves.sort(key=lambda x: x[1], reverse=True)
 
-        yield from (move for move, _ in ordered_moves)
+        for move_and_score in ordered_moves:
+            yield move_and_score[0]
 
 
     def alpha_beta(self, chess_board: chess.Board, depth: np.int8, alpha, beta, maximizing_player: bool, score: Score):
         # Lookup position in transposition table
         key = chess_board._transposition_key() # ? Much faster
-        # key = zobrist_hash(chess_board) # ! REALLY SLOW
+        # key = zobrist_hash(chess_board) # ! REALLY SLOW (probably because it is not incremental)
         tt_entry = self.transposition_table.get(key)
 
         # If position is in transposition table and depth is sufficient
@@ -301,18 +305,15 @@ class ChessBot:
             original_score = score
             best_value = MIN_VALUE
             for move in self.ordered_moves_generator(chess_board, tt_move):
-                has_legal_moves = True
                 self.moves_checked += 1
                 if CHECKING_MOVE_ARROW and depth >= RENDER_DEPTH:  # Display the root move
                     self.display_checking_move_arrow(move)
 
-                score.update(chess_board, move)
+                score = original_score.updated(chess_board, move)
 
                 chess_board.push(move)
                 value = self.alpha_beta(chess_board, depth - 1, alpha, beta, False, score)[0]
                 chess_board.pop()
-
-                score = original_score # Restore score
 
                 if value > best_value:
                     best_value = value
@@ -329,13 +330,11 @@ class ChessBot:
                 if CHECKING_MOVE_ARROW and depth >= RENDER_DEPTH:  # Display the root move
                     self.display_checking_move_arrow(move)
 
-                score.update(chess_board, move)
+                score = original_score.updated(chess_board, move)
 
                 chess_board.push(move)
                 value = self.alpha_beta(chess_board, depth - 1, alpha, beta, True, score)[0]
                 chess_board.pop()
-
-                score = original_score
 
                 if value < best_value:
                     best_value = value
@@ -371,7 +370,6 @@ class ChessBot:
         """
         self.moves_checked = 0
 
-
         # Run minimax once with manual timing
         start_time = default_timer()
 
@@ -387,7 +385,18 @@ class ChessBot:
             MAX_VALUE,
             chess_board.turn,
             temp_score)
-        self.game.score.update(chess_board, best_move)
+        
+        # assert best_move is not None, "No best move returned" # TODO remove when done testing
+        if best_move is None:
+
+            legal_moves = list(chess_board.legal_moves)
+            if len(legal_moves) == 1:
+                best_move = legal_moves[0]
+            else:
+                print(f"{colors.RED}No best move returned{colors.RESET}")
+                print(f"{colors.RED}Legal moves: {legal_moves}{colors.RESET}")
+
+        self.game.score = self.game.score.updated(chess_board, best_move)
 
         time_taken = default_timer() - start_time
 
@@ -402,13 +411,13 @@ class ChessBot:
 
         # Calculate memory usage more accurately
         tt_entry_size = getsizeof(TTEntry(0, 0, EXACT, chess.Move.from_uci("e2e4")))
-        tt_size_mb = len(self.transposition_table) * tt_entry_size / (1024 * 1024)
         transposition_table_entries = len(self.transposition_table)
+        tt_size_mb = transposition_table_entries * tt_entry_size / (1024 * 1024)
         # eval_size_mb = sum(getsizeof(k) + getsizeof(v) for k, v in list(self.evaluation_cache.items())[:10]) / 10
         # eval_size_mb = eval_size_mb * len(self.evaluation_cache) / (1024 * 1024)
 
         # # Print cache statistics
-        print(f"Transposition table: {colors.BOLD}{colors.MAGENTA}{len(self.transposition_table):,}{colors.RESET} entries, "
+        print(f"Transposition table: {colors.BOLD}{colors.MAGENTA}{transposition_table_entries:,}{colors.RESET} entries, "
             f"{colors.BOLD}{colors.CYAN}{tt_size_mb:.4f}{colors.RESET} MB")
         # print(f"Evaluation cache: {colors.BOLD}{colors.MAGENTA}{len(self.evaluation_cache):,}{colors.RESET} entries, "
         #       f"{colors.BOLD}{colors.CYAN}{eval_size_mb:.4f}{colors.RESET} MB")

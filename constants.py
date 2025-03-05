@@ -4,7 +4,7 @@ from typing_extensions import TypeAlias  # For GameStage
 
 # Set to None for standard starting position, or FEN string for custom starting position
 STARTING_FEN: str = None
-# STARTING_FEN: str = "r1b1r1k1/ppp2qbp/6p1/1N1p4/5B2/3p2P1/PPPK1p1P/R4Q1B w - - 0 25"
+# STARTING_FEN: str = "2kr1r2/p1p2p1p/4N1p1/1p2B3/5R2/1B4P1/P1P3KP/2q5 b - - 0 26" # Checkmate soon
 
 # Board and piece settings
 PIECE_VALUES: dict[int, int] = {
