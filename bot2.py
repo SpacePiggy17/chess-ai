@@ -45,7 +45,7 @@ class Score: # Positive values favor white, negative values favor black
     eg: np.int16 # Endgame score
     npm: np.uint16 # Non-pawn material (for phase calculation)
 
-    def updated(self, chess_board: chess.Board, move: chess.Move) -> None:
+    def updated(self, board: chess.Board, move: chess.Move) -> None:
         """
         Returns the updated material, midgame, endgame, and non-pawn material scores based on the move.
         Much faster than re-evaluating the entire board, even if only the leaf nodes are re-evaluated.
@@ -56,8 +56,8 @@ class Score: # Positive values favor white, negative values favor black
         to_square = move.to_square
         promotion_piece_type: chess.PieceType = move.promotion
 
-        piece_type = chess_board.piece_type_at(from_square)
-        piece_color = chess_board.turn
+        piece_type = board.piece_type_at(from_square)
+        piece_color = board.turn
         color_multiplier = 1 if piece_color else -1
 
         # Cache tables for faster lookups
@@ -91,7 +91,7 @@ class Score: # Positive values favor white, negative values favor black
         if promotion_piece_type: # Promotion
             # Update bishop pair bonus if pawn promoted to bishop
             if promotion_piece_type == chess.BISHOP:
-                bishop_count_before = chess_board.pieces_mask(chess.BISHOP, piece_color).bit_count()
+                bishop_count_before = board.pieces_mask(chess.BISHOP, piece_color).bit_count()
                 if bishop_count_before == 1: # If 2 bishops now, add bonus
                     material += color_multiplier * BISHOP_PAIR_BONUS
 
@@ -110,12 +110,12 @@ class Score: # Positive values favor white, negative values favor black
             return Score(material, mg, eg, npm)
         
         # Handle captures
-        captured_piece_type = chess_board.piece_type_at(to_square)
+        captured_piece_type = board.piece_type_at(to_square)
 
         # Get en passant capture piece if applicable
-        if not captured_piece_type and piece_type == chess.PAWN and chess_board.is_en_passant(move):
+        if not captured_piece_type and piece_type == chess.PAWN and board.is_en_passant(move):
             to_square -= color_multiplier * 8
-            captured_piece_type = chess_board.piece_type_at(from_square)
+            captured_piece_type = board.piece_type_at(from_square)
 
         if captured_piece_type: # Capture
             if captured_piece_type != chess.PAWN: # and captured_piece_type != chess.KING:
@@ -123,7 +123,7 @@ class Score: # Positive values favor white, negative values favor black
                 npm -= piece_values[captured_piece_type]
 
                 # Update bishop pair bonus if bishop captured
-                if captured_piece_type == chess.BISHOP and chess_board.pieces_mask(captured_piece_type, not piece_color).bit_count() == 2:
+                if captured_piece_type == chess.BISHOP and board.pieces_mask(captured_piece_type, not piece_color).bit_count() == 2:
                     material -= -color_multiplier * BISHOP_PAIR_BONUS # If 2 bishops before, remove bonus
 
             if not piece_color: # Flip squares for white
@@ -136,7 +136,7 @@ class Score: # Positive values favor white, negative values favor black
 
         return Score(material, mg, eg, npm)
 
-    def initialize_scores(self, chess_board: chess.Board) -> None:
+    def initialize_scores(self, board: chess.Board) -> None:
         """
         Initialize values for starting position (works with custom starting FENs).
         Calculates material score, npm score, and evaluates piece positions.
@@ -160,9 +160,9 @@ class Score: # Positive values favor white, negative values favor black
 
         # Evaluate each piece type
         for square in chess.SQUARES:
-            piece_type = chess_board.piece_type_at(square)
+            piece_type = board.piece_type_at(square)
             if piece_type:
-                piece_color = chess_board.color_at(square)
+                piece_color = board.color_at(square)
 
                 # Update npm score
                 if piece_type != chess.PAWN and piece_type != chess.KING:
@@ -205,7 +205,7 @@ class ChessBot:
         self.game.checking_move = move
         self.game.display_board(self.game.last_move)  # Update display
 
-    def evaluate_position(self, chess_board: chess.Board, score: Score, tt_entry=None, has_legal_moves=True):
+    def evaluate_position(self, board: chess.Board, score: Score, tt_entry=None, has_legal_moves=True):
         """
         Evaluate the current position.
         Positive values favor white, negative values favor black.
@@ -215,16 +215,16 @@ class ChessBot:
 
         # Check expensive operations once
         if has_legal_moves:
-            has_legal_moves = any(chess_board.legal_moves) # ! REALLY SLOW
+            has_legal_moves = any(board.legal_moves) # ! REALLY SLOW
 
         # Evaluate game-ending conditions
         if not has_legal_moves:  # No legal moves
-            if chess_board.is_check():  # Checkmate
-                return -100_000 if chess_board.turn else 100_000
+            if board.is_check():  # Checkmate
+                return -100_000 if board.turn else 100_000
             return 0  # Stalemate
-        elif chess_board.is_insufficient_material(): # (semi-slow) Insufficient material for either side to win
+        elif board.is_insufficient_material(): # (semi-slow) Insufficient material for either side to win
             return 0
-        elif chess_board.can_claim_fifty_moves(): # Avoid fifty move rule
+        elif board.can_claim_fifty_moves(): # Avoid fifty move rule
             return 0
 
         # Return score (material + interpolated mg/eg score)
@@ -233,9 +233,9 @@ class ChessBot:
         interpolated_score = ((int(score.mg) * phase) + (int(score.eg) * (256 - phase))) >> 8 # Int division by 256
         return score.material + interpolated_score
 
-    # def quiescence(self, chess_board: chess.Board, alpha, beta, depth):
+    # def quiescence(self, board: chess.Board, alpha, beta, depth):
 
-    def ordered_moves_generator(self, chess_board: chess.Board, tt_move: Optional[chess.Move]):
+    def ordered_moves_generator(self, board: chess.Board, tt_move: Optional[chess.Move]):
         """Generate ordered moves for the current position."""
         # Yield transposition table move first
         if tt_move:
@@ -244,22 +244,22 @@ class ChessBot:
         # Cache tables for faster lookups
         piece_values = PIECE_VALUES_STOCKFISH
         
-        color_multiplier = 1 if chess_board.turn else -1
+        color_multiplier = 1 if board.turn else -1
 
         # Sort remaining moves
         ordered_moves = []
-        for move in chess_board.legal_moves:
+        for move in board.legal_moves:
             if not tt_move or move != tt_move: # Skip TT move since already yielded
                 score = 0
 
                 # Capturing a piece bonus (MVV/LVA - Most Valuable Victim/Least Valuable Attacker)
-                if chess_board.is_capture(move):
-                    victim_piece_type = chess_board.piece_type_at(move.to_square)
-                    attacker_piece_type = chess_board.piece_type_at(move.from_square)
+                if board.is_capture(move):
+                    victim_piece_type = board.piece_type_at(move.to_square)
+                    attacker_piece_type = board.piece_type_at(move.from_square)
 
                     # Handle en passant captures
                     if not victim_piece_type and attacker_piece_type == chess.PAWN: # Implied en passant capture since no piece at to_square and pawn moving
-                        victim_piece_type = chess_board.piece_type_at(move.to_square - (color_multiplier * 8))
+                        victim_piece_type = board.piece_type_at(move.to_square - (color_multiplier * 8))
                         score += 5 # Small bonus for en passant captures
 
                     # Prioritize capturing higher value pieces using lower value pieces
@@ -268,7 +268,7 @@ class ChessBot:
                 if move.promotion: # Promotion bonus
                     score += 1_000 + piece_values[move.promotion] - piece_values[chess.PAWN]
 
-                # if chess_board.gives_check(move): # Check bonus
+                # if board.gives_check(move): # Check bonus
                 #     score += 100
 
                 # # Center control bonus
@@ -283,17 +283,18 @@ class ChessBot:
             yield move_and_score[0]
 
 
-    def alpha_beta(self, chess_board: chess.Board, depth: np.int8, alpha, beta, maximizing_player: bool, score: Score):
+    def alpha_beta(self, board: chess.Board, depth: np.int8, alpha, beta, maximizing_player: bool, score: Score):
         """
         Fail-soft alpha-beta search with transposition table.
         Scores are incrementally updated based on the move.
         Returns the best value and move for the current player.
+        TODO, PV search, iterative deepening, quiescence search, killer moves, history heuristic, late move reduction, null move pruning
         """
         original_alpha, original_beta = alpha, beta
 
         # Lookup position in transposition table
-        key = chess_board._transposition_key() # ? Much faster
-        # key = zobrist_hash(chess_board) # ! REALLY SLOW (probably because it is not incremental)
+        key = board._transposition_key() # ? Much faster
+        # key = zobrist_hash(board) # ! REALLY SLOW (probably because it is not incremental)
         tt_entry = self.transposition_table.get(key)
 
         # If position is in transposition table and depth is sufficient
@@ -310,22 +311,22 @@ class ChessBot:
 
         # Terminal node check
         if depth == 0:
-            return self.evaluate_position(chess_board, score, tt_entry), None
+            return self.evaluate_position(board, score, tt_entry), None
 
         tt_move = tt_entry.best_move if tt_entry else None
         best_move = None
         if maximizing_player:
             best_value = MIN_VALUE
-            for move in self.ordered_moves_generator(chess_board, tt_move):
+            for move in self.ordered_moves_generator(board, tt_move):
                 self.moves_checked += 1
                 if CHECKING_MOVE_ARROW and depth >= RENDER_DEPTH:  # Display the root move
                     self.display_checking_move_arrow(move)
 
-                updated_score = score.updated(chess_board, move)
+                updated_score = score.updated(board, move)
 
-                chess_board.push(move)
-                value = self.alpha_beta(chess_board, depth - 1, alpha, beta, False, updated_score)[0]
-                chess_board.pop()
+                board.push(move)
+                value = self.alpha_beta(board, depth - 1, alpha, beta, False, updated_score)[0]
+                board.pop()
 
                 if value > best_value: # Get new best value and move
                     best_value, best_move = value, move
@@ -335,16 +336,16 @@ class ChessBot:
 
         else: # Minimizing player
             best_value = MAX_VALUE
-            for move in self.ordered_moves_generator(chess_board, tt_move):
+            for move in self.ordered_moves_generator(board, tt_move):
                 self.moves_checked += 1
                 if CHECKING_MOVE_ARROW and depth >= RENDER_DEPTH:  # Display the root move
                     self.display_checking_move_arrow(move)
 
-                updated_score = score.updated(chess_board, move)
+                updated_score = score.updated(board, move)
 
-                chess_board.push(move)
-                value = self.alpha_beta(chess_board, depth - 1, alpha, beta, True, updated_score)[0]
-                chess_board.pop()
+                board.push(move)
+                value = self.alpha_beta(board, depth - 1, alpha, beta, True, updated_score)[0]
+                board.pop()
 
                 if value < best_value: # Get new best value and move
                     best_value, best_move = value, move
@@ -353,12 +354,12 @@ class ChessBot:
                         break  # Alpha cutoff (fail-low: other positions are better)
         
         if best_move is None: # If no legal moves, evaluate position (best move is None if loop did iterate through legal moves)
-            return self.evaluate_position(chess_board, score, tt_entry, has_legal_moves=False), None
+            return self.evaluate_position(board, score, tt_entry, has_legal_moves=False), None
 
         # Store position in transposition table
-        if best_value <= original_alpha:
+        if best_value <= alpha: # TODO compare with original alpha and beta
             flag = UPPERBOUND
-        elif best_value >= original_beta:
+        elif best_value >= beta:
             flag = LOWERBOUND
         else:
             flag = EXACT
@@ -372,15 +373,22 @@ class ChessBot:
     def next_guess(self, alpha, beta, subtree_count):
         return alpha + (beta - alpha) * (subtree_count - 1) / subtree_count
 
-    def best_node_search(self, chess_board: chess.Board, alpha, beta, maximizing_player: bool):
-        ordered_moves = list(self.ordered_moves_generator(chess_board, None))
+    def best_node_search(self, board: chess.Board, alpha, beta, maximizing_player: bool):
+        """
+        Experimental best node search (fuzzified game search) algorithm based on the paper by Dmitrijs Rutko.
+        Uses the next guess function to return the separation value for the next iteration.
+        """
+        ordered_moves = list(self.ordered_moves_generator(board, None))
         subtree_count = len(ordered_moves)
         color_multipier = 1 if maximizing_player else -1
 
         original_score = self.game.score
         better_count = 0
+
+        best_move = None
+        best_value = None
         while beta - alpha >= 2 and better_count != 1:
-            test = self.next_guess(alpha, beta, subtree_count)
+            seperation_value = self.next_guess(alpha, beta, subtree_count)
 
             better_count = 0
             better = []
@@ -389,32 +397,33 @@ class ChessBot:
                 if CHECKING_MOVE_ARROW and DEPTH >= RENDER_DEPTH:
                     self.display_checking_move_arrow(move)
 
-                score = original_score.updated(chess_board, move)
+                score = original_score.updated(board, move)
 
-                chess_board.push(move)
-                best_value = self.alpha_beta(chess_board, DEPTH - 1, -test, -(test-1), not maximizing_player, score)[0]
-                chess_board.pop()
+                board.push(move) # TODO -(sep_value+1)
+                move_value = self.alpha_beta(board, DEPTH - 1, -(seperation_value), -(seperation_value-1), not maximizing_player, score)[0]
+                board.pop()
 
-                if color_multipier * best_value >= test:
+                if color_multipier * move_value >= seperation_value:
                     better_count += 1
                     better.append(move)
                     best_move = move
+                    best_value = move_value
 
             # Update alpha-beta range
-            if better_count > 0:
-                alpha = test
+            if better_count > 1:
+                alpha = seperation_value
 
                 # # Update number of sub-trees that exceeds seperation test value
                 if subtree_count != better_count:
                     subtree_count = better_count
                     ordered_moves = better
             else:
-                beta = test
+                beta = seperation_value
                 
-        return best_move
+        return best_value, best_move
 
 
-    def get_move(self, chess_board: chess.Board):
+    def get_move(self, board: chess.Board):
         """
         Main method to get the best move for the current player.
         """
@@ -424,27 +433,29 @@ class ChessBot:
         start_time = default_timer()
         
         # best_value, best_move = self.alpha_beta(
-        #     chess_board,
+        #     board,
         #     DEPTH,
         #     MIN_VALUE,
         #     MAX_VALUE,
-        #     chess_board.turn,
+        #     board.turn,
         #     self.game.score)
-        best_move = self.best_node_search(chess_board, MIN_VALUE, MAX_VALUE, chess_board.turn)
+
+        alpha, beta = MIN_VALUE, MAX_VALUE
+        best_value, best_move = self.best_node_search(board, alpha, beta, board.turn)
         
-        # print(f"Goal value: {best_value}")
+        print(f"Goal value: {best_value}")
         
         # assert best_move is not None, "No best move returned" # TODO remove when done testing
         if best_move is None:
 
-            legal_moves = list(chess_board.legal_moves)
+            legal_moves = list(board.legal_moves)
             if len(legal_moves) == 1:
                 best_move = legal_moves[0]
             else:
                 print(f"{colors.RED}No best move returned{colors.RESET}")
                 print(f"{colors.RED}Legal moves: {legal_moves}{colors.RESET}")
 
-        self.game.score = self.game.score.updated(chess_board, best_move)
+        self.game.score = self.game.score.updated(board, best_move)
 
         time_taken = default_timer() - start_time
 
@@ -471,6 +482,6 @@ class ChessBot:
         #       f"{colors.BOLD}{colors.CYAN}{eval_size_mb:.4f}{colors.RESET} MB")
 
         # Print the FEN
-        print(f"FEN: {chess_board.fen()}")
+        print(f"FEN: {board.fen()}")
 
         return best_move

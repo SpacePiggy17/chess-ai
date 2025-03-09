@@ -9,7 +9,32 @@ STARTING_FEN: str = None
 # STARTING_FEN: str = "r1b1k2r/pppp1p1p/4p1pB/4P3/3q4/6P1/PPP2K1P/RN3BNR w kq - 0 13"
 # STARTING_FEN: str = "r1b1k2r/pppp1p1p/4p1pB/4P3/8/6P1/PqP3KP/RN3BNR w kq - 0 14" # Big jump in evaluation
 
-# Board and piece settings
+MAX_VALUE: np.int16 = 32767 # 2**(16-1) - 1 (max value for 16 bit integer)
+MIN_VALUE: np.int16 = -32768 # -2**(16-1) (min value for 16 bit integer)
+
+# CENTER_SQUARES = {chess.D4, chess.D5, chess.E4, chess.E5}  # Chess already has this built in
+
+# Game settings
+IS_BOT: bool = True  # Set to False for human vs bot, True for bot vs bot
+LAST_MOVE_ARROW: bool = True  # Set to True to display last move arrow
+TT_SIZE: np.int8 = 64 # Size of the transposition table (in MB)
+
+# Debug settings
+CHECKING_MOVE_ARROW: bool = False  # Set to True to display checking move arrow (switches the mode to svg rendering)
+UPDATE_DELAY_MS: np.int8 = 30  # Delay between visual updates in milliseconds
+RENDER_DEPTH: np.int8 = 5 # Depth to render checking moves (set to DEPTH to render root moves)
+
+BREAK_TURN: np.int8 = None # Number of turns to break after (for debugging)
+# BREAK_TURN: np.int8 = 5 # Number of turns to break after (for debugging)
+
+# Search settings
+DEPTH: np.int8 = 5  # Search depth for the minimax algorithm
+# RENDER_DEPTH: np.int8 = 0 # Depth to render checking moves (set to DEPTH to render root moves)
+
+
+'''
+Board and piece values
+'''
 PIECE_VALUES: dict[int, int] = {
     chess.PAWN: 100,
     chess.KNIGHT: 320,
@@ -25,7 +50,8 @@ PIECE_VALUES_STOCKFISH: dict[int, int] = {
     chess.ROOK: 1_276,
     chess.QUEEN: 2_538,
     chess.KING: 32_000
-}
+} # TODO MG: 198, 817, 836, 1_270, 2_521, EG: 258, 846, 857, 1_278, 2_558
+
 BISHOP_PAIR_BONUS: int = PIECE_VALUES_STOCKFISH[chess.PAWN] >> 1 # Half the value of a pawn
 
 # Total npm at start (16604 with stockfish values)
@@ -187,26 +213,7 @@ FLIP = np.array([
      0,  1,  2,  3,  4,  5,  6,  7,
 ], dtype=np.int32)
 
-# Piece square tables for black (flip for white with PSQT[game_stage][piece_type][FLIP[square]])
-# PSQT: list[dict[chess.PieceType, np.ndarray]] = [
-#     {
-#         chess.PAWN: mg_pawn_table,
-#         chess.KNIGHT: mg_knight_table,
-#         chess.BISHOP: mg_bishop_table,
-#         chess.ROOK: mg_rook_table,
-#         chess.QUEEN: mg_queen_table,
-#         chess.KING: mg_king_table
-#     },
-#     {
-#         chess.PAWN: eg_pawn_table,
-#         chess.KNIGHT: eg_knight_table,
-#         chess.BISHOP: eg_bishop_table,
-#         chess.ROOK: eg_rook_table,
-#         chess.QUEEN: eg_queen_table,
-#         chess.KING: eg_king_table
-#     }
-# ]
-PSQT: list[list[chess.PieceType, np.ndarray]] = [ # Using a list instead of a dict for faster lookup
+PSQT: list[list[chess.PieceType, np.ndarray]] = [ # Using a list instead of a dict for less overhead (PSQT[MIDGAME/ENDGAME][piece_type][square])
     [
         None, # Python chess starts piece indexing at 1, so we add empty slots
         mg_pawn_table,
@@ -235,27 +242,3 @@ CASTLING_UPDATES: dict[tuple[int, int], tuple[int, int, bool]] = {
     (chess.E8, chess.G8, chess.BLACK): (chess.H8, chess.F8), # Black kingside
     (chess.E8, chess.C8, chess.BLACK): (chess.A8, chess.D8), # Black queenside
 }
-
-# MAX_VALUE: float = float('inf')
-# MIN_VALUE: float = float('-inf')
-
-MAX_VALUE: np.int16 = 32767 # 2**(16-1) - 1 (max value for 16 bit integer)
-MIN_VALUE: np.int16 = -32768 # -2**(16-1) (min value for 16 bit integer)
-# CENTER_SQUARES = {chess.D4, chess.D5, chess.E4, chess.E5}  # Chess already has this built in
-
-# Game settings
-IS_BOT: bool = True  # Set to False for human vs bot, True for bot vs bot
-LAST_MOVE_ARROW: bool = True  # Set to True to display last move arrow
-TT_SIZE: np.int8 = 64 # Size of the transposition table (in MB)
-
-# Debug settings
-CHECKING_MOVE_ARROW: bool = False  # Set to True to display checking move arrow (switches the mode to svg rendering)
-UPDATE_DELAY_MS: np.int8 = 30  # Delay between visual updates in milliseconds
-RENDER_DEPTH: np.int8 = 5 # Depth to render checking moves (set to DEPTH to render root moves)
-
-BREAK_TURN: np.int8 = None # Number of turns to break after (for debugging)
-# BREAK_TURN: np.int8 = 5 # Number of turns to break after (for debugging)
-
-# Search settings
-DEPTH: np.int8 = 5  # Search depth for the minimax algorithm
-# RENDER_DEPTH: np.int8 = 0 # Depth to render checking moves (set to DEPTH to render root moves)
